@@ -16,12 +16,12 @@ MAX_GPU_SAMPLES = 4
 
 
 def main(**kwargs):
-    logger = simple_logger(kwargs)
+    logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
     avg_best, count, accuracy = 0.0, 0, 0.0
-    train, dev, _, lang, slot_list, gating_dict, vocab_size_train = prepare_data(training=True,**kwargs)
+    train, dev, _, lang, slot_list, gating_dict, vocab_size_train = prepare_data(training=True, **kwargs)
 
-    model = TRADE(lang, slot_list, gating_dict, vocab_size_train, **kwargs)
+    model = TRADE(lang, slot_list, gating_dict, **kwargs)
     model.train()
 
     for epoch in range(200):
@@ -38,7 +38,7 @@ def main(**kwargs):
         if ((epoch+1) % kwargs['eval_patience']) == 0:
             model.eval()
             accuracy = model.evaluate(
-                dev, avg_best, slot_list[2], logger, kwargs['early_stopping'])
+                dev, slot_list[2], avg_best, logger, kwargs['early_stopping'])
             model.train()
             model.scheduler.step(accuracy)
 
