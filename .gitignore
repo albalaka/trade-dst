@@ -13,7 +13,6 @@ utils/multi-bleu.perl
 utils/utils_multiWOZ_DST.py
 utils/utils_temp.py
 utils/config.py
-utils/mapping.pair
 utils/fix_label.py
 plot*
 requirements.txt
