@@ -152,7 +152,7 @@ class TRADE(torch.nn.Module):
         return all_point_outputs, all_gate_outputs, words_pointer_output
 
     def evaluate(self, dev, metric_best, slots, logger, early_stopping=True):
-        print("EVALUATING")
+        print("EVALUATING ON DEV")
         all_predictions = {}
         inverse_gating_dict = dict([(v, k)
                                     for k, v in self.gating_dict.items()])
@@ -220,6 +220,68 @@ class TRADE(torch.nn.Module):
             if joint_acc_score >= metric_best:
                 self.save_model('ACC-{:.4f}'.format(joint_acc_score))
             return joint_acc_score
+
+    def test(self, test, slots, logger):
+        print("EVALUATING ON TEST")
+        all_predictions = {}
+        inverse_gating_dict = dict([(v, k)
+                                    for k, v in self.gating_dict.items()])
+        for j, data_test in enumerate(tqdm(test)):
+            batch_size = len(data_test['context_len'])
+            _, gates, words = self.encode_and_decode(data_test, False, slots)
+
+            for batch_idx in range(batch_size):
+                if data_test["ID"][batch_idx] not in all_predictions.keys():
+                    all_predictions[data_test['ID'][batch_idx]] = {}
+                all_predictions[data_test["ID"][batch_idx]][data_test["turn_id"][batch_idx]] = {
+                    "turn_belief": data_test["turn_belief"][batch_idx]}
+                predict_belief_bsz_ptr = []
+                predicted_gates = torch.argmax(
+                    gates.transpose(0, 1)[batch_idx], dim=1)
+
+                for slot_idx, gate in enumerate(predicted_gates):
+                    if gate == self.gating_dict['none']:
+                        continue
+                    elif gate == self.gating_dict['ptr']:
+                        pred = np.transpose(words[slot_idx])[batch_idx]
+                        st = []
+                        for token in pred:
+                            if token == 'EOS':
+                                break
+                            else:
+                                st.append(token)
+                        st = " ".join(st)
+                        if st == 'none':
+                            continue
+                        else:
+                            predict_belief_bsz_ptr.append(
+                                f"{slots[slot_idx]}-{st}")
+                    else:
+                        predict_belief_bsz_ptr.append(
+                            f"{slots[slot_idx]}-{inverse_gating_dict[gate.item()]}")
+
+                all_predictions[data_test["ID"][batch_idx]][data_test["turn_id"]
+                                                           [batch_idx]]["pred_beliefstate_ptr"] = predict_belief_bsz_ptr
+
+                if set(data_test['turn_belief'][batch_idx]) != set(predict_belief_bsz_ptr) and self.kwargs['gen_sample']:
+                    print("True", set(data_test["turn_belief"][batch_idx]))
+                    print("Pred", set(predict_belief_bsz_ptr), "\n")
+
+        if self.kwargs['gen_sample']:
+            json.dump(all_predictions, open(
+                "all_prediction_{}.json".format(self.name), 'w'), indent=2)
+
+        joint_acc_score, turn_acc_score, joint_F1_score = self.evaluate_metrics(
+            all_predictions, "pred_beliefstate_ptr", slots)
+
+        evaluation_metrics = {
+            "Joint_accuracy": joint_acc_score,
+            "Turn accuracy": turn_acc_score,
+            "Joint F1": joint_F1_score
+        }
+        logger.logger['testing'].append(['evaluation', evaluation_metrics])
+        print(evaluation_metrics)
+
 
     def evaluate_metrics(self, all_predictions, from_which, slots):
         """

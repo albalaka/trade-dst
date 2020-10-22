@@ -1,4 +1,3 @@
-from tqdm import tqdm
 import argparse
 from torch import cuda
 
@@ -6,52 +5,18 @@ from models.alon_TRADE import TRADE
 from utils.multiwoz import prepare_data
 from utils.logger import simple_logger
 
-UNK_token = 0
-PAD_token = 1
-SOS_token = 2
-EOS_token = 3
-ENT_token = 4
-
 MAX_GPU_SAMPLES = 4
 
 
 def main(**kwargs):
     logger = simple_logger(kwargs)
 
-    avg_best, count, accuracy = 0.0, 0, 0.0
-    train, dev, _, lang, slot_list, gating_dict, vocab_size_train = prepare_data(training=True,**kwargs)
+    _, _, test, lang, slot_list, gating_dict, vocab_size_train = prepare_data(training=False, **kwargs)
 
     model = TRADE(lang, slot_list, gating_dict, vocab_size_train, **kwargs)
-    model.train()
+    model.eval()
 
-    for epoch in range(200):
-        print(f"Epoch {epoch}")
-        logger.save()
-
-        pbar = tqdm(enumerate(train), total=len(train))
-        for i, data in pbar:
-            model.train_batch(
-                data, slot_list[1], logger, reset=True if i == 0 else False)
-            model.optimize(kwargs['clip'])
-            pbar.set_description(model.print_loss())
-
-        if ((epoch+1) % kwargs['eval_patience']) == 0:
-            model.eval()
-            accuracy = model.evaluate(
-                dev, avg_best, slot_list[2], logger, kwargs['early_stopping'])
-            model.train()
-            model.scheduler.step(accuracy)
-
-            if accuracy >= avg_best:
-                avg_best = accuracy
-                count = 0
-                best_model = model
-            else:
-                count += 1
-
-            if count == kwargs['patience'] or (accuracy == 1.0 and kwargs['early_stopping'] == None):
-                print("ran out of patience, stopping early")
-                break
+    model.test(test, slot_list[3], logger)
 
 
 if __name__ == "__main__":
