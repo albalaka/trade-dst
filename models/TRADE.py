@@ -74,7 +74,7 @@ class TRADE(torch.nn.Module):
     def reset(self):
         self.loss, self.print_every, self.loss_pointer, self.loss_gate = 0, 1, 0, 0
 
-    def train_batch(self, data, slots, logger, reset=False):
+    def train_batch(self, data, slots, logger=None, reset=False):
         """
         Train a single batch
         :param data: a single batch of data from the dataloader
@@ -86,26 +86,24 @@ class TRADE(torch.nn.Module):
         self.optimizer.zero_grad()
 
         # Encode and Decode
-        use_teacher_forcing = random.random(
-        ) < self.kwargs['teacher_forcing_ratio']
-        all_pointer_outputs, all_gate_outputs, _ = self.encode_and_decode(
-            data, use_teacher_forcing, slots)
+        use_teacher_forcing = random.random() < self.kwargs['teacher_forcing_ratio']
+        all_pointer_outputs, all_gate_outputs, _ = self.encode_and_decode(data, use_teacher_forcing, slots)
 
         loss_pointer = masked_cross_entropy_for_value(all_pointer_outputs.transpose(0, 1).contiguous(),
                                                       data['generate_y'].contiguous(), data['y_lengths'])
-        loss_gate = self.cross_entropy(all_gate_outputs.transpose(0, 1).contiguous(
-        ).view(-1, all_gate_outputs.shape[-1]), data['gating_label'].contiguous().view(-1))
+        loss_gate = self.cross_entropy(all_gate_outputs.transpose(0, 1).contiguous().view(-1, all_gate_outputs.shape[-1]), data['gating_label'].contiguous().view(-1))
 
         # keep loss for gradient separately
         loss = loss_pointer + loss_gate
         self.loss_grad = loss
 
         # log loss per batch
-        logger.logger['training'].append(['training_batch', {
-            'loss': loss.item(),
-            'loss_pointer': loss_pointer.item(),
-            'loss_gates': loss_gate.item()
-        }])
+        if logger:
+            logger.logger['training'].append(['training_batch', {
+                'loss': loss.item(),
+                'loss_pointer': loss_pointer.item(),
+                'loss_gates': loss_gate.item()
+            }])
 
         # track loss for each component just for plotting purposes
         self.loss += loss.data
@@ -127,8 +125,7 @@ class TRADE(torch.nn.Module):
             # why not just go straight to binomial mask?
             story_shape = data['context'].shape
             random_mask = np.ones(story_shape)
-            binomial_mask = np.random.binomial(
-                [np.ones((story_shape[0], story_shape[1]))], 1-self.dropout)[0]
+            binomial_mask = np.random.binomial([np.ones((story_shape[0], story_shape[1]))], 1-self.dropout)[0]
             random_mask = random_mask * binomial_mask
             random_mask = torch.Tensor(random_mask).to(self.kwargs['device'])
             story = data['context'] * random_mask.long()
@@ -137,8 +134,7 @@ class TRADE(torch.nn.Module):
             story = data['context']
 
         # Encode the dialogue history
-        encoded_outputs, encoded_hidden = self.encoder(
-            story.transpose(0, 1), data['context_len'])
+        encoded_outputs, encoded_hidden = self.encoder(story.transpose(0, 1), data['context_len'])
 
         # Get list of words that can be copied
         batch_size = len(data['context_len'])
@@ -151,11 +147,10 @@ class TRADE(torch.nn.Module):
 
         return all_point_outputs, all_gate_outputs, words_pointer_output
 
-    def evaluate(self, dev, metric_best, slots, logger, early_stopping=True):
+    def evaluate(self, dev, slots, metric_best=None, logger=None, early_stopping=True):
         print("EVALUATING ON DEV")
         all_predictions = {}
-        inverse_gating_dict = dict([(v, k)
-                                    for k, v in self.gating_dict.items()])
+        inverse_gating_dict = dict([(v, k) for k, v in self.gating_dict.items()])
         for j, data_dev in enumerate(tqdm(dev)):
             batch_size = len(data_dev['context_len'])
             _, gates, words = self.encode_and_decode(data_dev, False, slots)
@@ -164,7 +159,7 @@ class TRADE(torch.nn.Module):
                 if data_dev["ID"][batch_idx] not in all_predictions.keys():
                     all_predictions[data_dev['ID'][batch_idx]] = {}
                 all_predictions[data_dev["ID"][batch_idx]][data_dev["turn_id"][batch_idx]] = {
-                    "turn_belief": data_dev["turn_belief"][batch_idx]}
+                                            "turn_belief": data_dev["turn_belief"][batch_idx]}
                 predict_belief_bsz_ptr = []
                 predicted_gates = torch.argmax(
                     gates.transpose(0, 1)[batch_idx], dim=1)
@@ -209,7 +204,8 @@ class TRADE(torch.nn.Module):
             "Turn accuracy": turn_acc_score,
             "Joint F1": joint_F1_score
         }
-        logger.logger['training'].append(['evaluation', evaluation_metrics])
+        if logger:
+            logger.logger['training'].append(['evaluation', evaluation_metrics])
         print(evaluation_metrics)
 
         if (early_stopping == "F1"):
@@ -221,11 +217,10 @@ class TRADE(torch.nn.Module):
                 self.save_model('ACC-{:.4f}'.format(joint_acc_score))
             return joint_acc_score
 
-    def test(self, test, slots, logger):
+    def test(self, test, slots, logger=None):
         print("EVALUATING ON TEST")
         all_predictions = {}
-        inverse_gating_dict = dict([(v, k)
-                                    for k, v in self.gating_dict.items()])
+        inverse_gating_dict = dict([(v, k) for k, v in self.gating_dict.items()])
         for j, data_test in enumerate(tqdm(test)):
             batch_size = len(data_test['context_len'])
             _, gates, words = self.encode_and_decode(data_test, False, slots)
@@ -233,8 +228,7 @@ class TRADE(torch.nn.Module):
             for batch_idx in range(batch_size):
                 if data_test["ID"][batch_idx] not in all_predictions.keys():
                     all_predictions[data_test['ID'][batch_idx]] = {}
-                all_predictions[data_test["ID"][batch_idx]][data_test["turn_id"][batch_idx]] = {
-                    "turn_belief": data_test["turn_belief"][batch_idx]}
+                all_predictions[data_test["ID"][batch_idx]][data_test["turn_id"][batch_idx]] = {"turn_belief": data_test["turn_belief"][batch_idx]}
                 predict_belief_bsz_ptr = []
                 predicted_gates = torch.argmax(
                     gates.transpose(0, 1)[batch_idx], dim=1)
@@ -254,11 +248,9 @@ class TRADE(torch.nn.Module):
                         if st == 'none':
                             continue
                         else:
-                            predict_belief_bsz_ptr.append(
-                                f"{slots[slot_idx]}-{st}")
+                            predict_belief_bsz_ptr.append(f"{slots[slot_idx]}-{st}")
                     else:
-                        predict_belief_bsz_ptr.append(
-                            f"{slots[slot_idx]}-{inverse_gating_dict[gate.item()]}")
+                        predict_belief_bsz_ptr.append(f"{slots[slot_idx]}-{inverse_gating_dict[gate.item()]}")
 
                 all_predictions[data_test["ID"][batch_idx]][data_test["turn_id"]
                                                             [batch_idx]]["pred_beliefstate_ptr"] = predict_belief_bsz_ptr
@@ -271,15 +263,15 @@ class TRADE(torch.nn.Module):
             json.dump(all_predictions, open(
                 "all_prediction_{}.json".format(self.name), 'w'), indent=2)
 
-        joint_acc_score, turn_acc_score, joint_F1_score = self.evaluate_metrics(
-            all_predictions, "pred_beliefstate_ptr", slots)
+        joint_acc_score, turn_acc_score, joint_F1_score = self.evaluate_metrics(all_predictions, "pred_beliefstate_ptr", slots)
 
         evaluation_metrics = {
             "Joint_accuracy": joint_acc_score,
             "Turn accuracy": turn_acc_score,
             "Joint F1": joint_F1_score
         }
-        logger.logger['testing'].append(['evaluation', evaluation_metrics])
+        if logger:
+            logger.logger['testing'].append(['evaluation', evaluation_metrics])
         print(evaluation_metrics)
 
     def evaluate_metrics(self, all_predictions, from_which, slots):
@@ -298,13 +290,11 @@ class TRADE(torch.nn.Module):
                 total += 1
 
                 # compute slot accuracy
-                temp_acc = self.compute_slot_acc(
-                    set(turn['turn_belief']), set(turn[from_which]), slots)
+                temp_acc = self.compute_slot_acc(set(turn['turn_belief']), set(turn[from_which]), slots)
                 turn_acc += temp_acc
 
                 # compute joint F1 score
-                temp_F1, temp_recall, temp_precision = self.compute_precision_recall_F1(
-                    set(turn['turn_belief']), set(turn[from_which]))
+                temp_F1, temp_recall, temp_precision = self.compute_precision_recall_F1(set(turn['turn_belief']), set(turn[from_which]))
                 F1_pred += temp_F1
 
         # joint accuracy requires the each slot within a turn to be correct to get a point
@@ -369,11 +359,9 @@ class EncoderRNN(torch.nn.Module):
         self.device = device
         self.dropout = dropout
         self.dropout_layer = torch.nn.Dropout(dropout)
-        self.embedding = torch.nn.Embedding(
-            vocab_size, hidden_size, padding_idx=PAD_token)
+        self.embedding = torch.nn.Embedding(vocab_size, hidden_size, padding_idx=PAD_token)
         self.embedding.weight.data.normal_(0, 0.1)
-        self.gru = torch.nn.GRU(hidden_size, hidden_size, n_layers,
-                                dropout=self.dropout, bidirectional=True)
+        self.gru = torch.nn.GRU(hidden_size, hidden_size, n_layers, dropout=self.dropout, bidirectional=True)
 
         if load_embedding:
             with open(os.path.join('data', f'emb{self.vocab_size}.json')) as f:
@@ -381,8 +369,7 @@ class EncoderRNN(torch.nn.Module):
             new = self.embedding.weight.data.new
             self.embedding.weight.data.copy_(new(E))
             self.embedding.weight.requires_grad = True
-            print("Encoder embedding requires_grad",
-                  self.embedding.weight.requires_grad)
+            print("Encoder embedding requires_grad", self.embedding.weight.requires_grad)
 
     def get_state(self, batch_size):
         """Get cell states and hidden states"""
@@ -394,12 +381,10 @@ class EncoderRNN(torch.nn.Module):
 
         hidden = self.get_state(input_sequences.size(1))
         if input_lengths:
-            embedded = torch.nn.utils.rnn.pack_padded_sequence(
-                embedded, input_lengths, batch_first=False)
+            embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths, batch_first=False)
         outputs, hidden = self.gru(embedded, hidden)
         if input_lengths:
-            outputs, _ = torch.nn.utils.rnn.pad_packed_sequence(
-                outputs, batch_first=False)
+            outputs, _ = torch.nn.utils.rnn.pad_packed_sequence(outputs, batch_first=False)
         hidden = hidden[0] + hidden[1]
         outputs = outputs[:, :, :self.hidden_size] + \
             outputs[:, :, self.hidden_size:]
@@ -439,10 +424,8 @@ class Generator(torch.nn.Module):
                 encoded_lengths, story, max_pointers, target_batches, use_teacher_forcing, slots):
 
         # initialize tensors for pointers and gates
-        all_pointer_outputs = torch.zeros(
-            [len(slots), batch_size, max_pointers, self.vocab_size], device=self.device)
-        all_gate_outputs = torch.zeros(
-            [len(slots), batch_size, self.num_gates], device=self.device)
+        all_pointer_outputs = torch.zeros([len(slots), batch_size, max_pointers, self.vocab_size], device=self.device)
+        all_gate_outputs = torch.zeros([len(slots), batch_size, self.num_gates], device=self.device)
 
         # Get slot embeddings
         slot_emb_dict = {}
@@ -450,14 +433,12 @@ class Generator(torch.nn.Module):
             # Domain embedding
             if slot.split("-")[0] in self.slot_w2i.keys():
                 domain_w2idx = [self.slot_w2i[slot.split("-")[0]]]
-                domain_w2idx = torch.tensor(
-                    domain_w2idx, device=self.device)
+                domain_w2idx = torch.tensor(domain_w2idx, device=self.device)
                 domain_emb = self.Slot_emb(domain_w2idx)
             # Slot embbeding
             if slot.split("-")[1] in self.slot_w2i.keys():
                 slot_w2idx = [self.slot_w2i[slot.split("-")[1]]]
-                slot_w2idx = torch.tensor(
-                    slot_w2idx, device=self.device)
+                slot_w2idx = torch.tensor(slot_w2idx, device=self.device)
                 slot_emb = self.Slot_emb(slot_w2idx)
 
             # combine domain and slot embeddings by addition
@@ -476,35 +457,26 @@ class Generator(torch.nn.Module):
         # if self.kwargs['parallel_decode']:
 
         # Compute pointer-generator output, with all (domain, slot) pairs in a single batch
-        decoder_input = self.dropout_layer(
-            slot_emb_arr).view(-1, self.hidden_size)  # (batch*|slot|) * emb
-        hidden = encoded_hidden.repeat(
-            1, len(slots), 1)  # 1 * (batch*|slot|) * emb
+        decoder_input = self.dropout_layer(slot_emb_arr).view(-1, self.hidden_size)  # (batch*|slot|) * emb
+        hidden = encoded_hidden.repeat(1, len(slots), 1)  # 1 * (batch*|slot|) * emb
         words_point_out = [[] for i in range(len(slots))]
 
         for word_idx in range(max_pointers):
-            dec_state, hidden = self.gru(
-                decoder_input.expand_as(hidden), hidden)
+            dec_state, hidden = self.gru(decoder_input.expand_as(hidden), hidden)
 
             enc_out = encoded_outputs.repeat(len(slots), 1, 1)
             enc_len = encoded_lengths * len(slots)
-            context_vec, logits, prob = self.attend(
-                enc_out, hidden.squeeze(0), enc_len)
+            context_vec, logits, prob = self.attend(enc_out, hidden.squeeze(0), enc_len)
 
             if word_idx == 0:
-                all_gate_outputs = torch.reshape(
-                    self.W_gate(context_vec), all_gate_outputs.size())
+                all_gate_outputs = torch.reshape(self.W_gate(context_vec), all_gate_outputs.size())
 
-            p_vocab = self.attend_vocab(
-                self.embedding.weight, hidden.squeeze(0))
-            p_gen_vec = torch.cat(
-                [dec_state.squeeze(0), context_vec, decoder_input], -1)
+            p_vocab = self.attend_vocab(self.embedding.weight, hidden.squeeze(0))
+            p_gen_vec = torch.cat([dec_state.squeeze(0), context_vec, decoder_input], -1)
             vocab_pointer_switches = self.sigmoid(self.W_ratio(p_gen_vec))
-            p_context_ptr = torch.zeros(
-                p_vocab.size(), device=self.device)
+            p_context_ptr = torch.zeros(p_vocab.size(), device=self.device)
 
-            p_context_ptr.scatter_add_(
-                1, story.repeat(len(slots), 1), prob)
+            p_context_ptr.scatter_add_(1, story.repeat(len(slots), 1), prob)
 
             final_p_vocab = (1 - vocab_pointer_switches).expand_as(p_context_ptr) * p_context_ptr + \
                 vocab_pointer_switches.expand_as(p_context_ptr) * p_vocab
@@ -512,15 +484,12 @@ class Generator(torch.nn.Module):
             words = [self.lang.index2word[w_idx.item()] for w_idx in pred_word]
 
             for si in range(len(slots)):
-                words_point_out[si].append(
-                    words[si*batch_size:(si+1)*batch_size])
+                words_point_out[si].append(words[si*batch_size:(si+1)*batch_size])
 
-            all_pointer_outputs[:, :, word_idx, :] = torch.reshape(
-                final_p_vocab, (len(slots), batch_size, self.vocab_size))
+            all_pointer_outputs[:, :, word_idx, :] = torch.reshape(final_p_vocab, (len(slots), batch_size, self.vocab_size))
 
             if use_teacher_forcing:
-                decoder_input = self.embedding(torch.flatten(
-                    target_batches[:, :, word_idx].transpose(1, 0)))
+                decoder_input = self.embedding(torch.flatten(target_batches[:, :, word_idx].transpose(1, 0)))
             else:
                 decoder_input = self.embedding(pred_word)
 
