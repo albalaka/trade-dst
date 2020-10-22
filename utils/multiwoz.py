@@ -207,7 +207,7 @@ def read_language(dataset_path, gating_dict, slots, dataset,
     return data, max_response_len, slot_temp
 
 
-def get_sequence_dataloader(data, language, mem_language, batch_size, shuffle=False,
+def get_sequence_dataloader(data, language, mem_language, batch_size, shuffle=True,
                             num_workers=0, pin_memory=False):
     data_keys = data[0].keys()
     data_info = {k: [] for k in data_keys}
