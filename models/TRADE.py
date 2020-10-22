@@ -9,7 +9,7 @@ from utils.masked_cross_entropy import masked_cross_entropy_for_value
 
 
 class TRADE(torch.nn.Module):
-    def __init__(self, lang, slots, gating_dict, vocab_size, **kwargs):
+    def __init__(self, lang, slots, gating_dict, **kwargs):
         super(TRADE, self).__init__()
         self.kwargs = kwargs
         self.hidden_size = kwargs['hidden']
