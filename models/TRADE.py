@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 
-from utils.tmp_masked_cross_entropy import masked_cross_entropy_for_value
+from utils.masked_cross_entropy import masked_cross_entropy_for_value
 
 
 class TRADE(torch.nn.Module):
