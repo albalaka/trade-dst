@@ -1,7 +1,7 @@
 import argparse
 from torch import cuda
 
-from models.alon_TRADE import TRADE
+from models.TRADE import TRADE
 from utils.multiwoz import prepare_data
 from utils.logger import simple_logger
 

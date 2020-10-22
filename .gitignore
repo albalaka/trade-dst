@@ -4,7 +4,7 @@ sftp-config.json
 data/
 *.pyc
 lang_data/
-models/TRADE.py
+models/OLD_TRADE.py
 models/__pycache__
 utils/__pycache__
 utils/masked_cross_entropy.py
