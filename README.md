@@ -37,5 +37,5 @@ For this given model, we would test by
 
 ```shell
 MODEL_PATH=save/TRADE-multiwozDST/HDD400-BSZ4-DR0.2-ACC-0.4867
-python3 test.py --model_path=$MODEL_PATH
+python3 test.py --model_path=$MODEL_PATH --log_path=log.json
 ```
