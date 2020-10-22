@@ -63,8 +63,8 @@ class TRADE(torch.nn.Module):
         self.print_every += 1
         return 'Average Loss:{:.2f},Average Pointer Loss:{:.2f},Average Gating Loss:{:.2f}'.format(print_loss_avg, print_loss_pointer, print_loss_gate)
 
-    def save_model(self, acc_score):
-        directory = f"save/TRADE-{self.kwargs['dataset']}{self.kwargs['task']}/HDD{self.hidden_size}-BSZ{self.kwargs['batch_size']}-DR{self.dropout}-ACC{acc_score}"
+    def save_model(self, score):
+        directory = f"save/TRADE-{self.kwargs['dataset']}{self.kwargs['task']}/HDD{self.hidden_size}-BSZ{self.kwargs['batch_size']}-DR{self.dropout}-{score}"
         if not os.path.exists(directory):
             os.makedirs(directory)
         torch.save(self.encoder, directory + '/enc.pt')
@@ -261,7 +261,7 @@ class TRADE(torch.nn.Module):
                             f"{slots[slot_idx]}-{inverse_gating_dict[gate.item()]}")
 
                 all_predictions[data_test["ID"][batch_idx]][data_test["turn_id"]
-                                                           [batch_idx]]["pred_beliefstate_ptr"] = predict_belief_bsz_ptr
+                                                            [batch_idx]]["pred_beliefstate_ptr"] = predict_belief_bsz_ptr
 
                 if set(data_test['turn_belief'][batch_idx]) != set(predict_belief_bsz_ptr) and self.kwargs['gen_sample']:
                     print("True", set(data_test["turn_belief"][batch_idx]))
@@ -281,7 +281,6 @@ class TRADE(torch.nn.Module):
         }
         logger.logger['testing'].append(['evaluation', evaluation_metrics])
         print(evaluation_metrics)
-
 
     def evaluate_metrics(self, all_predictions, from_which, slots):
         """
