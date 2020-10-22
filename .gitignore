@@ -4,24 +4,8 @@ sftp-config.json
 data/
 *.pyc
 lang_data/
-models/OLD_TRADE.py
 models/__pycache__
 utils/__pycache__
-utils/OLD_masked_cross_entropy.py
-utils/measures.py
-utils/multi-bleu.perl
-utils/utils_multiWOZ_DST.py
-utils/utils_temp.py
-utils/config.py
-utils/fix_label.py
-plot*
-requirements.txt
-
-EWC_train.py
-fine_tune.py
-GEM_train.py
-myTest.py
-myTrain.py
 
 
 notes_to_self.txt
