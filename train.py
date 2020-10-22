@@ -30,15 +30,13 @@ def main(**kwargs):
 
         pbar = tqdm(enumerate(train), total=len(train))
         for i, data in pbar:
-            model.train_batch(
-                data, slot_list[1], logger, reset=True if i == 0 else False)
+            model.train_batch(data, slot_list[1], logger, reset=True if i == 0 else False)
             model.optimize(kwargs['clip'])
             pbar.set_description(model.print_loss())
 
         if ((epoch+1) % kwargs['eval_patience']) == 0:
             model.eval()
-            accuracy = model.evaluate(
-                dev, slot_list[2], avg_best, logger, kwargs['early_stopping'])
+            accuracy = model.evaluate(dev, slot_list[2], avg_best, logger, kwargs['early_stopping'])
             model.train()
             model.scheduler.step(accuracy)
 
