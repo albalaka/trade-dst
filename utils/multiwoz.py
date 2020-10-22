@@ -65,9 +65,7 @@ class Lang():
             self.n_words += 1
 
 
-def read_language(dataset_path, gating_dict, slots, dataset,
-                  language, mem_language, only_domain='', except_domain='',
-                  data_ratio=100):
+def read_language(dataset_path, gating_dict, slots, dataset,language, mem_language, only_domain='', except_domain='', data_ratio=100):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to a json dataset (rg. data/train_dials.json)
     :param gating_dict: dict with mapping for gating mechanism (ptr, dont care, none)
@@ -88,10 +86,9 @@ def read_language(dataset_path, gating_dict, slots, dataset,
 
     # create the vocab for this dataset
     for dialogue_dict in dialogues:
-        if dataset == "train":
-            for turn in dialogue_dict['dialogue']:
-                language.index_words(turn['system_transcript'], 'utter')
-                language.index_words(turn['transcript'], 'utter')
+        for turn in dialogue_dict['dialogue']:
+            language.index_words(turn['system_transcript'], 'utter')
+            language.index_words(turn['transcript'], 'utter')
 
     # For only using a portion of total data
     if data_ratio != 100:
@@ -112,11 +109,8 @@ def read_language(dataset_path, gating_dict, slots, dataset,
         # For training/testing on separate domains
         if only_domain and only_domain not in dialogue_dict['domains']:
             continue
-        if (except_domain and dataset == 'test' and
-            except_domain not in dialogue_dict['domains']) \
-                or \
-            (except_domain and dataset != 'test' and \
-         except_domain in dialogue_dict['domains']):
+        if (except_domain and dataset == 'test' and except_domain not in dialogue_dict['domains']) \
+            or (except_domain and dataset != 'test' and except_domain in dialogue_dict['domains']):
             continue
 
         # Read dialogue data
@@ -288,22 +282,19 @@ def prepare_data(training, **kwargs):
 
     if training:
         # Get training data, longest training turn length, slots used in training
-        data_train, max_len_train, slot_train = read_language(
-            file_train, gating_dict, all_slots, "train", lang, mem_lang,
-            data_ratio=kwargs['train_data_ratio'])
-        dataloader_train = get_sequence_dataloader(
-            data_train, lang, mem_lang, batch_size)
+        data_train, max_len_train, slot_train = read_language(file_train, gating_dict, all_slots, "train", lang, mem_lang,
+                                                              data_ratio=kwargs['train_data_ratio'])
+        dataloader_train = get_sequence_dataloader(data_train, lang, mem_lang, batch_size)
         vocab_size_train = lang.n_words
 
         # Get dev data, longest dev turn length, slots used in dev
-        data_dev, max_len_dev, slot_dev = read_language(
-            file_dev, gating_dict, all_slots, "dev", lang, mem_lang,
-            data_ratio=kwargs['dev_data_ratio'])
-        dataloader_dev = get_sequence_dataloader(
-            data_dev, lang, mem_lang, batch_size)
+        data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang,
+                                                        data_ratio=kwargs['dev_data_ratio'])
+        dataloader_dev = get_sequence_dataloader(data_dev, lang, mem_lang, batch_size)
 
-        data_test, max_len_test, slot_test, dataloader_test =\
-            [], 0, [], []
+        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", lang, mem_lang,
+                                                           data_ratio=kwargs['test_data_ratio'])
+        dataloader_test = []
 
         # if language files already exist, load them
         if os.path.exists(os.path.join(lang_path, lang_name)) and \
@@ -325,10 +316,9 @@ def prepare_data(training, **kwargs):
                 pkl.dump(mem_lang, p)
 
         # dump the pre-calculated embeddings for the language
-        embedding_dump_path = f'data/emb{len(lang.index2word)}.json'
+        embedding_dump_path = f'data/emb{lang.n_words}.json'
         if not os.path.exists(embedding_dump_path) and load_embeddings:
-            dump_pretrained_emb(
-                lang.word2index, lang.index2word, embedding_dump_path)
+            dump_pretrained_emb(lang.word2index, lang.index2word, embedding_dump_path)
 
     # if testing
     else:
@@ -338,17 +328,14 @@ def prepare_data(training, **kwargs):
             mem_lang = pkl.load(handle)
 
         # set training and dev info to and 0's and empty
-        data_train, max_len_train, slot_train, dataloader_train, vocab_size_train =\
-            [], 0, [], [], 0
-        data_dev, max_len_dev, slot_dev, dataloader_dev, =\
-            [], 0, [], []
+        data_train, max_len_train, slot_train, dataloader_train, vocab_size_train = [], 0, [], [], 0
+
+        data_dev, max_len_dev, slot_dev, dataloader_dev = [], 0, [], [], 0
 
         # Get test data, longest test turn length, slots used in test
-        data_test, max_len_test, slot_test = read_language(
-            file_test, gating_dict, all_slots, "test", lang, mem_lang,
-            data_ratio=kwargs['test_data_ratio'])
-        dataloader_test = get_sequence_dataloader(
-            data_test, lang, mem_lang, batch_size)
+        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", 
+                                                            lang, mem_lang,data_ratio=kwargs['test_data_ratio'])
+        dataloader_test = get_sequence_dataloader(data_test, lang, mem_lang, batch_size)
 
     max_word = max(max_len_train, max_len_dev, max_len_test) + 1
 
