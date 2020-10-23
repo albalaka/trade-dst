@@ -71,8 +71,8 @@ def read_language(dataset_path, gating_dict, slots, dataset,language, mem_langua
     :param gating_dict: dict with mapping for gating mechanism (ptr, dont care, none)
     :param slots: all domain-slots
     :param dataset: train, dev, or test
-    :param language: Lang class to hold language
-    :param mem_language: Lang class, not sure what for exactly
+    :param language: Lang class for utterances
+    :param mem_language: Lang class, for belief states
     :param only_domain: specify if training/testing on a single domain
     :param except_domain: specify if training/testing on all except a specific domain
     """
@@ -154,8 +154,8 @@ def read_language(dataset_path, gating_dict, slots, dataset,language, mem_langua
             turn_belief_list = [str(k)+'-'+str(v)
                                 for k, v in turn_belief_dict.items()]
 
-            if dataset == 'train':
-                mem_language.index_words(turn_belief_dict, 'belief')
+            # if dataset == 'train':
+            mem_language.index_words(turn_belief_dict, 'belief')
 
             generate_y, gating_label = [], []
             for slot in slot_temp:
@@ -288,19 +288,15 @@ def prepare_data(training, **kwargs):
         vocab_size_train = lang.n_words
 
         # Get dev data, longest dev turn length, slots used in dev
-        data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang,
-                                                        data_ratio=kwargs['dev_data_ratio'])
+        data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang,data_ratio=kwargs['dev_data_ratio'])
         dataloader_dev = get_sequence_dataloader(data_dev, lang, mem_lang, batch_size)
 
-        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", lang, mem_lang,
-                                                           data_ratio=kwargs['test_data_ratio'])
+        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", lang, mem_lang,data_ratio=kwargs['test_data_ratio'])
         dataloader_test = []
 
         # if language files already exist, load them
-        if os.path.exists(os.path.join(lang_path, lang_name)) and \
-                os.path.exists(os.path.join(lang_path, mem_lang_name)):
-            print(
-                f"Loading saved language files from {os.path.join(lang_path, lang_name)}")
+        if os.path.exists(os.path.join(lang_path, lang_name)) and os.path.exists(os.path.join(lang_path, mem_lang_name)):
+            print(f"Loading saved language files from {os.path.join(lang_path, lang_name)}")
             with open(os.path.join(lang_path, lang_name), 'rb') as p:
                 lang = pkl.load(p)
             with open(os.path.join(lang_path, mem_lang_name), 'rb') as p:
