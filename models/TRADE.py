@@ -110,6 +110,48 @@ class TRADE(torch.nn.Module):
         self.loss_pointer += loss_pointer.item()
         self.loss_gate += loss_gate.item()
 
+    def calculate_loss_batch(self, data, slots, logger=None, reset=False):
+        """Calculate loss, but not gradients, on a single batch
+        :param data: a single batch of data from the dataloader
+        :param slots: domain-value slots to include
+        :param reset: reset overall loss, ptr loss, gating loss. Done at the first batch of every epoch
+        """
+        if reset:
+            self.reset()
+
+        # Encode and Decode
+        use_teacher_forcing = random.random() < self.kwargs['teacher_forcing_ratio']
+        all_pointer_outputs, all_gate_outputs, _ = self.encode_and_decode(data, use_teacher_forcing, slots)
+
+        loss_pointer = masked_cross_entropy_for_value(all_pointer_outputs.transpose(0, 1).contiguous(),
+                                                      data['generate_y'].contiguous(), data['y_lengths'])
+        loss_gate = self.cross_entropy(all_gate_outputs.transpose(0, 1).contiguous().view(-1, all_gate_outputs.shape[-1]), data['gating_label'].contiguous().view(-1))
+
+        # keep loss for gradient separately
+        loss = loss_pointer + loss_gate
+        self.loss_grad = loss
+        self.loss_grad.backward()
+
+        # log loss per batch
+        if logger:
+            logger.logger['training'].append(['training_batch', {
+                'loss': loss.item(),
+                'loss_pointer': loss_pointer.item(),
+                'loss_gates': loss_gate.item()
+            }])
+
+        # track loss for each component just for plotting purposes
+        self.loss += loss.data
+        self.loss_pointer += loss_pointer.item()
+        self.loss_gate += loss_gate.item()
+
+    def optimize_gradientaccumulation(self, clip):
+        """
+        :param clip: value to clip gradients at
+        """
+        clip_norm = torch.nn.utils.clip_grad_norm_(self.parameters(), clip)
+        self.optimizer.step()
+
     def optimize(self, clip):
         """
         :param clip: value to clip gradients at
