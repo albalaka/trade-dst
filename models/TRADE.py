@@ -30,17 +30,17 @@ class TRADE(torch.nn.Module):
         self.decoder = Generator(self.lang, self.encoder.embedding, self.lang.n_words,
                                  self.hidden_size, self.dropout, self.slots, self.num_gates, self.kwargs['device'])
 
-        if kwargs['model_path'] and 'enc.th' in os.listdir(kwargs['model_path']):
+        if kwargs['model_path'] and 'enc.pt' in os.listdir(kwargs['model_path']):
             if self.kwargs['device'] == 'cuda':
                 print("MODEL {} LOADED".format(kwargs['model_path']))
-                trained_encoder = torch.load(kwargs['model_path']+'/enc.th')
-                trained_decoder = torch.load(kwargs['model_path']+'/dec.th')
+                trained_encoder = torch.load(kwargs['model_path']+'/enc.pt')
+                trained_decoder = torch.load(kwargs['model_path']+'/dec.pt')
             else:
                 print("MODEL {} LOADED".format(kwargs['model_path']))
                 trained_encoder = torch.load(
-                    kwargs['model_path']+'/enc.th', lambda storage, loc: storage)
+                    kwargs['model_path']+'/enc.pt', lambda storage, loc: storage)
                 trained_decoder = torch.load(
-                    kwargs['model_path']+'/dec.th', lambda storage, loc: storage)
+                    kwargs['model_path']+'/dec.pt', lambda storage, loc: storage)
 
             self.encoder.load_state_dict(trained_encoder.state_dict())
             self.decoder.load_state_dict(trained_decoder.state_dict())
@@ -159,7 +159,7 @@ class TRADE(torch.nn.Module):
                 if data_dev["ID"][batch_idx] not in all_predictions.keys():
                     all_predictions[data_dev['ID'][batch_idx]] = {}
                 all_predictions[data_dev["ID"][batch_idx]][data_dev["turn_id"][batch_idx]] = {
-                                            "turn_belief": data_dev["turn_belief"][batch_idx]}
+                    "turn_belief": data_dev["turn_belief"][batch_idx]}
                 predict_belief_bsz_ptr = []
                 predicted_gates = torch.argmax(
                     gates.transpose(0, 1)[batch_idx], dim=1)
