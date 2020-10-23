@@ -9,6 +9,7 @@ MAX_GPU_SAMPLES = 4
 
 
 def main(**kwargs):
+
     logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
     _, _, test, lang, slot_list, gating_dict, _ = prepare_data(training=False, **kwargs)
@@ -17,6 +18,9 @@ def main(**kwargs):
     model.eval()
 
     model.test(test, slot_list[3], logger)
+
+    if logger:
+        logger.save()
 
 
 if __name__ == "__main__":

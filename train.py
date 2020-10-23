@@ -26,7 +26,8 @@ def main(**kwargs):
 
     for epoch in range(200):
         print(f"Epoch {epoch}")
-        logger.save()
+        if logger:
+            logger.save()
 
         pbar = tqdm(enumerate(train), total=len(train))
         for i, data in pbar:
@@ -48,6 +49,8 @@ def main(**kwargs):
                 count += 1
 
             if count == kwargs['patience'] or (accuracy == 1.0 and kwargs['early_stopping'] == None):
+                if logger:
+                    logger.save()
                 print("ran out of patience, stopping early")
                 break
 
