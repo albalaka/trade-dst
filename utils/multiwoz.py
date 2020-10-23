@@ -65,7 +65,7 @@ class Lang():
             self.n_words += 1
 
 
-def read_language(dataset_path, gating_dict, slots, dataset,language, mem_language, only_domain='', except_domain='', data_ratio=100):
+def read_language(dataset_path, gating_dict, slots, dataset, language, mem_language, only_domain='', except_domain='', data_ratio=100):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to a json dataset (rg. data/train_dials.json)
     :param gating_dict: dict with mapping for gating mechanism (ptr, dont care, none)
@@ -110,7 +110,7 @@ def read_language(dataset_path, gating_dict, slots, dataset,language, mem_langua
         if only_domain and only_domain not in dialogue_dict['domains']:
             continue
         if (except_domain and dataset == 'test' and except_domain not in dialogue_dict['domains']) \
-            or (except_domain and dataset != 'test' and except_domain in dialogue_dict['domains']):
+                or (except_domain and dataset != 'test' and except_domain in dialogue_dict['domains']):
             continue
 
         # Read dialogue data
@@ -288,10 +288,10 @@ def prepare_data(training, **kwargs):
         vocab_size_train = lang.n_words
 
         # Get dev data, longest dev turn length, slots used in dev
-        data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang,data_ratio=kwargs['dev_data_ratio'])
+        data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang, data_ratio=kwargs['dev_data_ratio'])
         dataloader_dev = get_sequence_dataloader(data_dev, lang, mem_lang, batch_size)
 
-        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", lang, mem_lang,data_ratio=kwargs['test_data_ratio'])
+        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", lang, mem_lang, data_ratio=kwargs['test_data_ratio'])
         dataloader_test = []
 
         # if language files already exist, load them
@@ -326,11 +326,11 @@ def prepare_data(training, **kwargs):
         # set training and dev info to and 0's and empty
         data_train, max_len_train, slot_train, dataloader_train, vocab_size_train = [], 0, [], [], 0
 
-        data_dev, max_len_dev, slot_dev, dataloader_dev = [], 0, [], [], 0
+        data_dev, max_len_dev, slot_dev, dataloader_dev = [], 0, [], []
 
         # Get test data, longest test turn length, slots used in test
-        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", 
-                                                            lang, mem_lang,data_ratio=kwargs['test_data_ratio'])
+        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test",
+                                                           lang, mem_lang, data_ratio=kwargs['test_data_ratio'])
         dataloader_test = get_sequence_dataloader(data_test, lang, mem_lang, batch_size)
 
     max_word = max(max_len_train, max_len_dev, max_len_test) + 1

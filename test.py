@@ -11,7 +11,7 @@ MAX_GPU_SAMPLES = 4
 def main(**kwargs):
     logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
-    _, _, test, lang, slot_list, gating_dict = prepare_data(training=False, **kwargs)
+    _, _, test, lang, slot_list, gating_dict, _ = prepare_data(training=False, **kwargs)
 
     model = TRADE(lang, slot_list, gating_dict, **kwargs)
     model.eval()
