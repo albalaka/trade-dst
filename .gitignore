@@ -1,4 +1,5 @@
 .vscode
+venv/
 save/
 sftp-config.json
 data/
