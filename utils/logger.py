@@ -26,3 +26,6 @@ class simple_logger():
         with open(self.save_path, "w") as p:
             json.dump(self.logger, p, indent=2)
         print(f"Saved log at {self.save_path}")
+
+    def training_update(self, status):
+        self.logger['training'].append(status)

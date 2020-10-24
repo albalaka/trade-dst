@@ -168,8 +168,7 @@ def masking(losses, mask):
         seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
         if mask[:, si].is_cuda:
             seq_range_expand = seq_range_expand.cuda()
-        seq_length_expand = mask[:, si].unsqueeze(
-            1).expand_as(seq_range_expand)
+        seq_length_expand = mask[:, si].unsqueeze(1).expand_as(seq_range_expand)
         mask_.append((seq_range_expand < seq_length_expand))
     mask_ = torch.stack(mask_)
     mask_ = mask_.transpose(0, 1)

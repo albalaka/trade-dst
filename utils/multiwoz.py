@@ -248,7 +248,7 @@ def prepare_data(training, **kwargs):
     file_dev = 'data/dev_dials.json'
     file_test = 'data/test_dials.json'
 
-    batch_size = kwargs['batch_size']
+    batch_size = kwargs['MAX_GPU_SAMPLES']
     load_embeddings = kwargs['load_embedding']
     lang_path = kwargs['lang_path']
 
