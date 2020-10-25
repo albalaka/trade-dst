@@ -39,3 +39,10 @@ For this given model, we would test by
 MODEL_PATH=save/TRADE-multiwozDST/HDD400-BSZ4-DR0.2-ACC-0.4867
 python3 test.py --model_path=$MODEL_PATH --log_path=log.json
 ```
+
+
+To run the scripts with NER, you will need to install spacy, as well as a pretrained NER model
+```shell
+pip install spacy
+python -m spacy download en_core_web_sm
+```
