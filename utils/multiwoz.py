@@ -1,11 +1,13 @@
+import utils.multiwoz_dataset as multiwoz_dataset
 import os
 import json
 import random
 import pickle as pkl
 from torch.utils.data import DataLoader
 from embeddings import GloveEmbedding, KazumaCharEmbedding
+import en_core_web_sm
+ner = en_core_web_sm.load()
 
-import utils.multiwoz_dataset as multiwoz_dataset
 
 # Main differences:
 #   default tokens in different order, additional ENT_token
@@ -32,9 +34,9 @@ class Lang():
 
     def __init__(self, PAD_token, SOS_token, EOS_token, UNK_token, ENT_token):
         self.word2index = {}
-        self.index2word = {PAD_token: "PAD", SOS_token: "SOS",
-                           EOS_token: "EOS", UNK_token: 'UNK',
-                           ENT_token: "ENT"}
+        self.index2word = {PAD_token: "<PAD>", SOS_token: "<SOS>",
+                           EOS_token: "<EOS>", UNK_token: "<UNK>",
+                           ENT_token: "<ENT>"}
         self.n_words = len(self.index2word)  # Count default tokens
         self.word2index = dict([(v, k) for k, v in self.index2word.items()])
 
@@ -65,7 +67,9 @@ class Lang():
             self.n_words += 1
 
 
-def read_language(dataset_path, gating_dict, slots, dataset, language, mem_language, only_domain='', except_domain='', data_ratio=100):
+def read_language(dataset_path, gating_dict, slots, dataset, language, mem_language,
+                  ENT_token=None, ground_truth_labels=False, NER_labels=False, only_domain='',
+                  except_domain='', data_ratio=100):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to a json dataset (rg. data/train_dials.json)
     :param gating_dict: dict with mapping for gating mechanism (ptr, dont care, none)
@@ -117,10 +121,33 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
         for turn in dialogue_dict['dialogue']:
             turn_domain = turn['domain']
             turn_idx = turn['turn_idx']
-            turn_utterance = turn['system_transcript']+" ; "+turn['transcript']
-            turn_utterance_stripped = turn_utterance.strip()
+            # turn_utterance = turn['system_transcript']+" ; "+turn['transcript']
+            # turn_utterance_stripped = turn_utterance.strip()
             dialogue_history += (turn['system_transcript'] +
                                  " ; "+turn['transcript']+" ; ")
+
+            # ADD grount truth labels from this turn
+            if ground_truth_labels:
+                dialogue_history = dialogue_history[:-3]
+                for domain_slot, value in turn['turn_label']:
+                    dialogue_history += f" {ENT_token} {value}"
+                dialogue_history += " ; "
+
+            # IF using NER, add NER labels here
+            # 2 possibilities, we can either add labels from both system and user utterance,
+            #       or we can add labels from only user utterance, try both
+            if NER_labels:
+                dialogue_history = dialogue_history[:-3]
+                res = ner(turn['transcript'])
+
+                for word in res:
+                    if word.ent_iob_ == "B":
+                        dialogue_history += f" {ENT_token} {word}"
+                    if word.ent_iod == "I" and str(word) not in ['nights']:
+                        dialogue_history += f" {word}"
+
+                dialogue_history += " ; "
+
             source_text = dialogue_history.strip()
             turn_belief_dict = fix_general_label_error(
                 turn['belief_state'], slots)
@@ -179,13 +206,13 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
 
             data_detail = {
                 "ID": dialogue_dict["dialogue_idx"],
-                "domains": dialogue_dict["domains"],
+                # "domains": dialogue_dict["domains"], # never used
                 "turn_domain": turn_domain,
                 "turn_id": turn_idx,
                 "dialog_history": source_text,
                 "turn_belief": turn_belief_list,
                 "gating_label": gating_label,
-                "turn_uttr": turn_utterance_stripped,
+                # "turn_uttr": turn_utterance_stripped, # never used
                 'generate_y': generate_y
             }
             data.append(data_detail)
@@ -283,12 +310,19 @@ def prepare_data(training, **kwargs):
     if training:
         # Get training data, longest training turn length, slots used in training
         data_train, max_len_train, slot_train = read_language(file_train, gating_dict, all_slots, "train", lang, mem_lang,
+                                                              ground_truth_labels=kwargs['ground_truth_labels'],
+                                                              NER_labels=kwargs['NER_labels'],
+                                                              ENT_token=lang.index2word[kwargs['ENT_token']],
                                                               data_ratio=kwargs['train_data_ratio'])
         dataloader_train = get_sequence_dataloader(data_train, lang, mem_lang, batch_size)
         vocab_size_train = lang.n_words
 
         # Get dev data, longest dev turn length, slots used in dev
-        data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang, data_ratio=kwargs['dev_data_ratio'])
+        data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang,
+                                                        ground_truth_labels=kwargs['ground_truth_labels'],
+                                                        NER_labels=kwargs['NER_labels'],
+                                                        ENT_token=lang.index2word[kwargs['ENT_token']],
+                                                        data_ratio=kwargs['dev_data_ratio'])
         dataloader_dev = get_sequence_dataloader(data_dev, lang, mem_lang, batch_size)
 
         data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", lang, mem_lang, data_ratio=kwargs['test_data_ratio'])
@@ -330,7 +364,11 @@ def prepare_data(training, **kwargs):
 
         # Get test data, longest test turn length, slots used in test
         data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test",
-                                                           lang, mem_lang, data_ratio=kwargs['test_data_ratio'])
+                                                           lang, mem_lang,
+                                                           ground_truth_labels=kwargs['ground_truth_labels'],
+                                                           NER_labels=kwargs['NER_labels'],
+                                                           ENT_token=lang.index2word[kwargs['ENT_token']],
+                                                           data_ratio=kwargs['test_data_ratio'])
         dataloader_test = get_sequence_dataloader(data_test, lang, mem_lang, batch_size)
 
     max_word = max(max_len_train, max_len_dev, max_len_test) + 1
