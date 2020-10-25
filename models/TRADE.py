@@ -64,7 +64,7 @@ class TRADE(torch.nn.Module):
     #     return 'Average Loss:{:.2f},Average Pointer Loss:{:.2f},Average Gating Loss:{:.2f}'.format(print_loss_avg, print_loss_pointer, print_loss_gate)
 
     def save_model(self, score):
-        directory = f"save/TRADE-{self.kwargs['dataset']}{self.kwargs['task']}/HDD{self.hidden_size}-BSZ{self.kwargs['batch_size']}-DR{self.dropout}-{score}"
+        directory = f"save/{self.kwargs['experiment_ID']}-TRADE-{self.kwargs['dataset']}{self.kwargs['task']}/HDD{self.hidden_size}-BSZ{self.kwargs['batch_size']}-DR{self.dropout}-{score}"
         if not os.path.exists(directory):
             os.makedirs(directory)
         torch.save(self.encoder, directory + '/enc.pt')
