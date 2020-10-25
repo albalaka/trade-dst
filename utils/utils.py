@@ -14,20 +14,16 @@ def parse_args():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment_ID", type=str, default="")
-    parser.add_argument("-bs", "--batch_size", type=int,
-                        default=MAX_GPU_SAMPLES)
+    parser.add_argument("-bs", "--batch_size", type=int, default=32)
     parser.add_argument("--MAX_GPU_SAMPLES", type=int, default=MAX_GPU_SAMPLES)
     parser.add_argument("--parallel_decode", type=bool, default=True)
     parser.add_argument("--hidden", type=int, default=400)
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.001)
     parser.add_argument("-dr", "--dropout", type=float, default=0.2)
-    parser.add_argument('-clip', '--clip', help='gradient clipping',
-                        default=10, type=int)
-    parser.add_argument('-tfr', '--teacher_forcing_ratio',
-                        help='teacher_forcing_ratio', type=float, default=0.5)
+    parser.add_argument('-clip', '--clip', help='gradient clipping', default=10, type=int)
+    parser.add_argument('-tfr', '--teacher_forcing_ratio', help='teacher_forcing_ratio', type=float, default=0.5)
     parser.add_argument('--load_embedding', type=bool, default=True)
-    parser.add_argument('--model_path', type=str,
-                        help="Use model_path if you want to load a pre-trained model")
+    parser.add_argument('--model_path', type=str, help="Use model_path if you want to load a pre-trained model")
     parser.add_argument('--lang_path', type=str, default="lang_data")
     parser.add_argument('--log_path', type=str)
     parser.add_argument('--dataset', type=str, default='multiwoz')
