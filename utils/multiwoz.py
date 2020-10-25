@@ -143,7 +143,7 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
                 for word in res:
                     if word.ent_iob_ == "B":
                         dialogue_history += f" {ENT_token} {word}"
-                    if word.ent_iod == "I" and str(word) not in ['nights']:
+                    if word.ent_iob == "I" and str(word) not in ['nights']:
                         dialogue_history += f" {word}"
 
                 dialogue_history += " ; "
