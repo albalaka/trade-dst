@@ -28,6 +28,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-bs", "--batch_size", type=int,
                         default=MAX_GPU_SAMPLES)
+    parser.add_argument("--MAX_GPU_SAMPLES", type=int, default=MAX_GPU_SAMPLES)
     parser.add_argument("--parallel_decode", type=bool, default=True)
     parser.add_argument("--hidden", type=int, default=400)
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.001)
