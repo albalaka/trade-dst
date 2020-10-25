@@ -25,6 +25,8 @@ To train a simple model that matches performance in original paper
 python3 train.py --log_path=log.json
 ```
 
+To train with ground truth labels appended to each utterance, use the --ground_truth_labels flag. Similarly, for NER entities, use --NER_labels
+
 To test the best model, find the encoder/decoder models in /save/TRADE-multiwozDST and select the model with highest dev set accuracy
 Model names follow the pattern HDD400-BSZ4-DR0.2-ACC-0.4867
 
