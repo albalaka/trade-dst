@@ -68,7 +68,7 @@ class Lang():
 
 
 def read_language(dataset_path, gating_dict, slots, dataset, language, mem_language,
-                  ENT_token=None, ground_truth_labels=False, NER_labels=False, only_domain='',
+                  ENT_token=None, ground_truth_labels=False, NER_labels=False, percent_ground_truth=100, only_domain='',
                   except_domain='', data_ratio=100):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to a json dataset (rg. data/train_dials.json)
@@ -130,7 +130,8 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
             if ground_truth_labels:
                 dialogue_history = dialogue_history[:-3]
                 for domain_slot, value in turn['turn_label']:
-                    dialogue_history += f" {ENT_token} {value}"
+                    if random.random() <= percent_ground_truth*0.01:
+                        dialogue_history += f" {ENT_token} {value}"
                 dialogue_history += " ; "
 
             # IF using NER, add NER labels here
@@ -313,6 +314,7 @@ def prepare_data(training, **kwargs):
                                                               ground_truth_labels=kwargs['ground_truth_labels'],
                                                               NER_labels=kwargs['NER_labels'],
                                                               ENT_token=lang.index2word[kwargs['ENT_token']],
+                                                              percent_ground_truth=kwargs['percent_ground_truth'],
                                                               data_ratio=kwargs['train_data_ratio'])
         dataloader_train = get_sequence_dataloader(data_train, lang, mem_lang, batch_size)
         vocab_size_train = lang.n_words
@@ -322,6 +324,7 @@ def prepare_data(training, **kwargs):
                                                         ground_truth_labels=kwargs['ground_truth_labels'],
                                                         NER_labels=kwargs['NER_labels'],
                                                         ENT_token=lang.index2word[kwargs['ENT_token']],
+                                                        percent_ground_truth=kwargs['percent_ground_truth'],
                                                         data_ratio=kwargs['dev_data_ratio'])
         dataloader_dev = get_sequence_dataloader(data_dev, lang, mem_lang, batch_size)
 
@@ -368,6 +371,7 @@ def prepare_data(training, **kwargs):
                                                            ground_truth_labels=kwargs['ground_truth_labels'],
                                                            NER_labels=kwargs['NER_labels'],
                                                            ENT_token=lang.index2word[kwargs['ENT_token']],
+                                                           percent_ground_truth=kwargs['percent_ground_truth'],
                                                            data_ratio=kwargs['test_data_ratio'])
         dataloader_test = get_sequence_dataloader(data_test, lang, mem_lang, batch_size)
 

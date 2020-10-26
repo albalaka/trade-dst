@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument('--test_data_ratio', type=int, default=100)
     parser.add_argument('--ground_truth_labels', action="store_true")
     parser.add_argument('--NER_labels', action="store_true")
+    parser.add_argument('--percent_ground_truth', type=int, default=100)
 
     args = parser.parse_args()
 
