@@ -139,12 +139,13 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
             #       or we can add labels from only user utterance, try both
             if NER_labels:
                 dialogue_history = dialogue_history[:-3]
-                res = ner(turn['transcript'])
 
+                # append entities from the user utterance
+                res = ner(turn['transcript'])
                 for word in res:
                     if word.ent_iob_ == "B":
                         dialogue_history += f" {ENT_token} {word}"
-                    if word.ent_iob == "I" and str(word) not in ['nights']:
+                    if word.ent_iob == "I":
                         dialogue_history += f" {word}"
 
                 dialogue_history += " ; "
