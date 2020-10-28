@@ -10,7 +10,22 @@ from utils.logger import simple_logger
 import utils.utils
 
 
+ALL_SLOTS = ['hotel-pricerange', 'hotel-type', 'hotel-parking', 'hotel-book stay', 'hotel-book day', 'hotel-book people',
+             'hotel-area', 'hotel-stars', 'hotel-internet', 'train-destination', 'train-day', 'train-departure',
+             'train-arriveby', 'train-book people', 'train-leaveat', 'attraction-area', 'restaurant-food',
+             'restaurant-pricerange', 'restaurant-area', 'attraction-name', 'restaurant-name',
+             'attraction-type', 'hotel-name', 'taxi-leaveat', 'taxi-destination', 'taxi-departure',
+             'restaurant-book time', 'restaurant-book day', 'restaurant-book people', 'taxi-arriveby']
+
+
 def main(**kwargs):
+    kwargs['drop_slots'] = ['hotel-pricerange', 'hotel-type', 'hotel-book stay', 'hotel-book day', 'hotel-book people',
+                            'hotel-area', 'hotel-stars', 'train-destination', 'train-day', 'train-departure',
+                            'train-arriveby', 'train-book people', 'train-leaveat', 'attraction-area', 'restaurant-food',
+                            'restaurant-pricerange', 'restaurant-area', 'attraction-name', 'restaurant-name',
+                            'attraction-type', 'hotel-name', 'taxi-leaveat', 'taxi-destination', 'taxi-departure',
+                            'restaurant-book time', 'restaurant-book day', 'restaurant-book people', 'taxi-arriveby']
+
     logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
     avg_best, count, accuracy = 0.0, 0, 0.0

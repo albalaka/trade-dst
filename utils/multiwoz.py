@@ -271,9 +271,10 @@ def dump_pretrained_emb(word2index, index2word, dump_path):
 
 def get_slot_information(ontology, drop_slots=[]):
     ontology_domains = dict(
-        [(k, v) for k, v in ontology.items() if k.split("-")[0] in EXPERIMENT_DOMAINS and k not in drop_slots])
+        [(k, v) for k, v in ontology.items() if k.split("-")[0] in EXPERIMENT_DOMAINS])
     slots = [k.replace(" ", "").lower() if ("book" not in k)
              else k.lower() for k in ontology_domains.keys()]
+    slots = [slot for slot in slots if slot not in drop_slots]
     return slots
 
 
