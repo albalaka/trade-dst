@@ -25,8 +25,6 @@ To train a simple model that matches performance in original paper
 python3 train.py --log_path=log.json
 ```
 
-To train with ground truth labels appended to each utterance, use the --ground_truth_labels flag. Similarly, for NER entities, use --NER_labels
-
 To test the best model, find the encoder/decoder models in /save/TRADE-multiwozDST and select the model with highest dev set accuracy
 Model names follow the pattern HDD400-BSZ4-DR0.2-ACC-0.4867
 
@@ -43,6 +41,19 @@ python3 test.py --model_path=$MODEL_PATH --log_path=log.json
 ```
 
 
+
+
+
+## Performance exploration
+
+To train with ground truth labels appended to each utterance, use the --ground_truth_labels flag. Similarly, for NER entities, use --NER_labels
+
+To compare varying amounts of ground truth labels, use the --percent_ground_truth flag
+
+To train and test a model without binary slots (hotel-parking, hotel-internet), use the --no_binary_slots flag. Similarly, to train and test without categorical slots (hotel-stars, hotel-pricerange, restaurant-pricerange) use the --no_categorical_slots flag.
+
+
+#### Notes
 To run the scripts with NER, you will need to install spacy, as well as a pretrained NER model
 ```shell
 pip install spacy
