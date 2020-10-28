@@ -72,6 +72,5 @@ def parse_args():
         args.drop_slots = ALL_SLOTS
         for slot in BINARY_SLOTS:
             args.drop_slots.remove(slot)
-    print(args.drop_slots)
 
     return vars(args)
