@@ -39,8 +39,6 @@ def main(**kwargs):
         pbar = tqdm(enumerate(train), total=len(train))
         for i, data in pbar:
 
-            # model.calculate_loss_batch(data, slot_list[1], logger, reset=True if i == 0 else False)
-
             # Calculate outputs
             outputs_pointer, outputs_gate, _ = model(data, slot_list[1])
 

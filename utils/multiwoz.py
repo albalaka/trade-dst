@@ -69,7 +69,7 @@ class Lang():
 
 def read_language(dataset_path, gating_dict, slots, dataset, language, mem_language,
                   ENT_token=None, ground_truth_labels=False, NER_labels=False, percent_ground_truth=100, only_domain='',
-                  except_domain='', data_ratio=100):
+                  except_domain='', data_ratio=100, drop_slots=None):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to a json dataset (rg. data/train_dials.json)
     :param gating_dict: dict with mapping for gating mechanism (ptr, dont care, none)
@@ -152,7 +152,7 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
 
             source_text = dialogue_history.strip()
             turn_belief_dict = fix_general_label_error(
-                turn['belief_state'], slots)
+                turn['belief_state'], slots, drop_slots)
 
             # For training/testing on separate domains
             # Generate domain-dependent slot list
@@ -180,8 +180,13 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
                     turn_belief_dict = dict(
                         [(k, v) for k, v in turn_belief_dict.items() if only_domain in k])
 
-            turn_belief_list = [str(k)+'-'+str(v)
-                                for k, v in turn_belief_dict.items()]
+            if drop_slots:
+                turn_belief_list = []
+                for k, v in turn_belief_dict.items():
+                    if k not in drop_slots:
+                        turn_belief_list.append(f"{k}-{v}")
+            else:
+                turn_belief_list = [f"{k}-{v}" for k, v in turn_belief_dict.items()]
 
             # if dataset == 'train':
             mem_language.index_words(turn_belief_dict, 'belief')
@@ -264,7 +269,7 @@ def dump_pretrained_emb(word2index, index2word, dump_path):
         json.dump(E, f)
 
 
-def get_slot_information(ontology, drop_slots = []):
+def get_slot_information(ontology, drop_slots=[]):
     ontology_domains = dict(
         [(k, v) for k, v in ontology.items() if k.split("-")[0] in EXPERIMENT_DOMAINS and k not in drop_slots])
     slots = [k.replace(" ", "").lower() if ("book" not in k)
@@ -316,7 +321,8 @@ def prepare_data(training, **kwargs):
                                                               NER_labels=kwargs['NER_labels'],
                                                               ENT_token=lang.index2word[kwargs['ENT_token']],
                                                               percent_ground_truth=kwargs['percent_ground_truth'],
-                                                              data_ratio=kwargs['train_data_ratio'])
+                                                              data_ratio=kwargs['train_data_ratio'],
+                                                              drop_slots=kwargs['drop_slots'])
         dataloader_train = get_sequence_dataloader(data_train, lang, mem_lang, batch_size)
         vocab_size_train = lang.n_words
 
@@ -326,10 +332,13 @@ def prepare_data(training, **kwargs):
                                                         NER_labels=kwargs['NER_labels'],
                                                         ENT_token=lang.index2word[kwargs['ENT_token']],
                                                         percent_ground_truth=kwargs['percent_ground_truth'],
-                                                        data_ratio=kwargs['dev_data_ratio'])
+                                                        data_ratio=kwargs['dev_data_ratio'],
+                                                        drop_slots=kwargs['drop_slots'])
         dataloader_dev = get_sequence_dataloader(data_dev, lang, mem_lang, batch_size)
 
-        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", lang, mem_lang, data_ratio=kwargs['test_data_ratio'])
+        data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test", lang,
+                                                           mem_lang, data_ratio=kwargs['test_data_ratio'],
+                                                           drop_slots=kwargs['drop_slots'])
         dataloader_test = []
 
         # if language files already exist, load them
@@ -373,7 +382,8 @@ def prepare_data(training, **kwargs):
                                                            NER_labels=kwargs['NER_labels'],
                                                            ENT_token=lang.index2word[kwargs['ENT_token']],
                                                            percent_ground_truth=kwargs['percent_ground_truth'],
-                                                           data_ratio=kwargs['test_data_ratio'])
+                                                           data_ratio=kwargs['test_data_ratio'],
+                                                           drop_slots=kwargs['drop_slots'])
         dataloader_test = get_sequence_dataloader(data_test, lang, mem_lang, batch_size)
 
     max_word = max(max_len_train, max_len_dev, max_len_test) + 1
@@ -399,8 +409,8 @@ def prepare_data(training, **kwargs):
     return dataloader_train, dataloader_dev, dataloader_test, langs, slots_list, gating_dict, vocab_size_train
 
 
-def fix_general_label_error(labels, slots):
-    label_dict = dict([(l["slots"][0][0], l["slots"][0][1]) for l in labels])
+def fix_general_label_error(labels, slots, drop_slots):
+    label_dict = dict([(l["slots"][0][0], l["slots"][0][1]) for l in labels if l["slots"][0][0] not in drop_slots])
 
     GENERAL_TYPO = {
         # type
