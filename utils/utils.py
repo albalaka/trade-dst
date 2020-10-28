@@ -8,6 +8,8 @@ EOS_token = 3
 ENT_token = 4
 
 MAX_GPU_SAMPLES = 4
+BINARY_SLOTS = ['hotel-parking', 'hotel-internet']
+CATEGORICAL_SLOTS = ['hotel-pricerange', 'hotel-stars', 'restaurant-pricerange']
 
 
 def parse_args():
@@ -37,18 +39,27 @@ def parse_args():
     parser.add_argument('--ground_truth_labels', action="store_true")
     parser.add_argument('--NER_labels', action="store_true")
     parser.add_argument('--percent_ground_truth', type=int, default=100)
+    parser.add_argument('--no_binary_slots', action='store_true')
+    parser.add_argument('--no_categorical_slots', action='store_true')
 
     args = parser.parse_args()
 
     assert(not (args.ground_truth_labels and args.NER_labels)), "Select only one of either ground truth, or NER labels"
 
     setattr(args, 'device', 'cuda' if cuda.is_available() else 'cpu')
-    setattr(args, 'UNK_token', 0)
-    setattr(args, 'PAD_token', 1)
-    setattr(args, 'SOS_token', 2)
-    setattr(args, 'EOS_token', 3)
-    setattr(args, 'ENT_token', 4)
+    setattr(args, 'UNK_token', UNK_token)
+    setattr(args, 'PAD_token', PAD_token)
+    setattr(args, 'SOS_token', SOS_token)
+    setattr(args, 'EOS_token', EOS_token)
+    setattr(args, 'ENT_token', ENT_token)
     setattr(args, 'unk_mask', True)
     setattr(args, 'early_stopping', None)
+
+    # if not using all slots, add them to drop slots
+    setattr(args, 'drop_slots', list())
+    if args.no_binary_slots:
+        args.drop_slots.extend(BINARY_SLOTS)
+    if args.no_categorical_slots:
+        args.drop_slots.extend(CATEGORICAL_SLOTS)
 
     return vars(args)

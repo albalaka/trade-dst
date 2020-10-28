@@ -264,9 +264,9 @@ def dump_pretrained_emb(word2index, index2word, dump_path):
         json.dump(E, f)
 
 
-def get_slot_information(ontology):
+def get_slot_information(ontology, drop_slots = []):
     ontology_domains = dict(
-        [(k, v) for k, v in ontology.items() if k.split("-")[0] in EXPERIMENT_DOMAINS])
+        [(k, v) for k, v in ontology.items() if k.split("-")[0] in EXPERIMENT_DOMAINS and k not in drop_slots])
     slots = [k.replace(" ", "").lower() if ("book" not in k)
              else k.lower() for k in ontology_domains.keys()]
     return slots
@@ -286,7 +286,7 @@ def prepare_data(training, **kwargs):
 
     # load domain-slot pairs from ontology
     ontology = json.load(open("data/multi-woz/MULTIWOZ2 2/ontology.json", 'r'))
-    all_slots = get_slot_information(ontology)
+    all_slots = get_slot_information(ontology, kwargs['drop_slots'])
     gating_dict = {"ptr": 0, "dontcare": 1, "none": 2}
 
     # Vocabulary
