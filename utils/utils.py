@@ -10,6 +10,12 @@ ENT_token = 4
 MAX_GPU_SAMPLES = 4
 BINARY_SLOTS = ['hotel-parking', 'hotel-internet']
 CATEGORICAL_SLOTS = ['hotel-pricerange', 'hotel-stars', 'restaurant-pricerange']
+ALL_SLOTS = ['hotel-pricerange', 'hotel-type', 'hotel-parking', 'hotel-book stay', 'hotel-book day', 'hotel-book people',
+             'hotel-area', 'hotel-stars', 'hotel-internet', 'train-destination', 'train-day', 'train-departure',
+             'train-arriveby', 'train-book people', 'train-leaveat', 'attraction-area', 'restaurant-food',
+             'restaurant-pricerange', 'restaurant-area', 'attraction-name', 'restaurant-name',
+             'attraction-type', 'hotel-name', 'taxi-leaveat', 'taxi-destination', 'taxi-departure',
+             'restaurant-book time', 'restaurant-book day', 'restaurant-book people', 'taxi-arriveby']
 
 
 def parse_args():
@@ -40,6 +46,7 @@ def parse_args():
     parser.add_argument('--NER_labels', action="store_true")
     parser.add_argument('--percent_ground_truth', type=int, default=100)
     parser.add_argument('--no_binary_slots', action='store_true')
+    parser.add_argument('--only_binary_slots', action='store_true')
     parser.add_argument('--no_categorical_slots', action='store_true')
 
     args = parser.parse_args()
@@ -61,5 +68,10 @@ def parse_args():
         args.drop_slots.extend(BINARY_SLOTS)
     if args.no_categorical_slots:
         args.drop_slots.extend(CATEGORICAL_SLOTS)
+    if args.only_binary_slots:
+        args.drop_slots = ALL_SLOTS
+        for slot in BINARY_SLOTS:
+            args.drop_slots.remove(slot)
+    print(args.drop_slots)
 
     return vars(args)
