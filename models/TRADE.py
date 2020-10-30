@@ -391,6 +391,10 @@ class TRADE(torch.nn.Module):
 
                 # ANALYSIS: compute score for each slot individually
                 for slot in turn['turn_belief']:
+                    # For some reason, in PMUL2256, the last turn contains a slot labeled as hospital
+                    #   it is clearly mislabeled, but I don't want to pull it from the dataset
+                    if 'hospital' in slot:
+                        continue
                     if slot in turn[from_which]:
                         individual_slot_scores[slot.rsplit("-", 1)[0]]["TP"] += 1
                     else:
