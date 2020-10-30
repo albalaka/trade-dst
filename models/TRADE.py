@@ -271,15 +271,15 @@ class TRADE(torch.nn.Module):
             "Joint F1": joint_F1_score
         }
         if logger:
-            logger.logger['training'].append([['evaluation', evaluation_metrics],
-                                              ['individual_slot_scores', individual_slot_scores],
-                                              ['unique_joint_slots_success', len(joint_success)],
-                                              ['top_100_joint_success', joint_success],
-                                              ['unique_missing_slots', len(missing_slots)],
-                                              ['top_50_missing_slots', missing_slots],
-                                              ['unique_incorrect_slots', len(incorrect_slots)],
-                                              ['top_50_incorrect_slots', incorrect_slots]
-                                              ])
+            logger.logger['training'].append({'evaluation': evaluation_metrics,
+                                              'individual_slot_scores': individual_slot_scores,
+                                              'unique_joint_slots_success': len(joint_success),
+                                              'top_100_joint_success': joint_success,
+                                              'unique_missing_slots': len(missing_slots),
+                                              'top_50_missing_slots': missing_slots,
+                                              'unique_incorrect_slots': len(incorrect_slots),
+                                              'top_50_incorrect_slots': incorrect_slots
+                                              })
         print(evaluation_metrics)
 
         if (early_stopping == "F1"):
@@ -357,15 +357,15 @@ class TRADE(torch.nn.Module):
             "Joint F1": joint_F1_score
         }
         if logger:
-            logger.logger['testing'].append([['evaluation', evaluation_metrics],
-                                             ['individual_slot_scores', individual_slot_scores],
-                                             ['unique_joint_slots_success', len(joint_success)],
-                                             ['top_100_joint_success', joint_success],
-                                             ['unique_missing_slots', len(missing_slots)],
-                                             ['top_50_missing_slots', missing_slots],
-                                             ['unique_incorrect_slots', len(incorrect_slots)],
-                                             ['top_50_incorrect_slots', incorrect_slots]
-                                             ])
+            logger.logger['testing'] = {'evaluation': evaluation_metrics,
+                                        'individual_slot_scores': individual_slot_scores,
+                                        'unique_joint_slots_success': len(joint_success),
+                                        'top_100_joint_success': joint_success,
+                                        'unique_missing_slots': len(missing_slots),
+                                        'top_50_missing_slots': missing_slots,
+                                        'unique_incorrect_slots': len(incorrect_slots),
+                                        'top_50_incorrect_slots': incorrect_slots
+                                        }
         print(evaluation_metrics)
 
     def evaluate_metrics(self, all_predictions, from_which, slots):

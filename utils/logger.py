@@ -16,7 +16,7 @@ class simple_logger():
             print(f"Initializing log at {self.save_path}")
             self.logger = {
                 "training": [],
-                "testing": [],
+                "testing": {},
                 "metadata": config,
                 "errors": []
             }
