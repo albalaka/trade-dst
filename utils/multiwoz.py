@@ -293,6 +293,7 @@ def prepare_data(training, **kwargs):
     # load domain-slot pairs from ontology
     ontology = json.load(open("data/multi-woz/MULTIWOZ2 2/ontology.json", 'r'))
     all_slots = get_slot_information(ontology, kwargs['drop_slots'])
+    # all_slots = get_slot_information(ontology)
     gating_dict = {"ptr": 0, "dontcare": 1, "none": 2}
 
     # Vocabulary
@@ -385,6 +386,7 @@ def prepare_data(training, **kwargs):
                                                            percent_ground_truth=kwargs['percent_ground_truth'],
                                                            data_ratio=kwargs['test_data_ratio'],
                                                            drop_slots=kwargs['drop_slots'])
+
         dataloader_test = get_sequence_dataloader(data_test, lang, mem_lang, batch_size)
 
     max_word = max(max_len_train, max_len_dev, max_len_test) + 1

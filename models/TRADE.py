@@ -262,7 +262,7 @@ class TRADE(torch.nn.Module):
             json.dump(all_predictions, open(
                 "all_prediction_{}.json".format(self.name), 'w'), indent=2)
 
-        joint_acc_score, turn_acc_score, joint_F1_score = self.evaluate_metrics(
+        joint_acc_score, turn_acc_score, joint_F1_score, individual_slot_scores, joint_success, missing_slots, incorrect_slots = self.evaluate_metrics(
             all_predictions, "pred_beliefstate_ptr", slots)
 
         evaluation_metrics = {
@@ -271,7 +271,15 @@ class TRADE(torch.nn.Module):
             "Joint F1": joint_F1_score
         }
         if logger:
-            logger.logger['training'].append(['evaluation', evaluation_metrics])
+            logger.logger['training'].append([['evaluation', evaluation_metrics],
+                                              ['individual_slot_scores', individual_slot_scores],
+                                              ['unique_joint_slots_success', len(joint_success)],
+                                              ['top_100_joint_success', joint_success],
+                                              ['unique_missing_slots', len(missing_slots)],
+                                              ['top_50_missing_slots', missing_slots],
+                                              ['unique_incorrect_slots', len(incorrect_slots)],
+                                              ['top_50_incorrect_slots', incorrect_slots]
+                                              ])
         print(evaluation_metrics)
 
         if (early_stopping == "F1"):
@@ -321,7 +329,7 @@ class TRADE(torch.nn.Module):
                 all_predictions[data_test["ID"][batch_idx]][data_test["turn_id"]
                                                             [batch_idx]]["pred_beliefstate_ptr"] = predict_belief_bsz_ptr
 
-                if set(data_test['turn_belief'][batch_idx]) != set(predict_belief_bsz_ptr) and self.kwargs['gen_sample']:
+                if self.kwargs['gen_sample'] and set(data_test['turn_belief'][batch_idx]) != set(predict_belief_bsz_ptr):
                     print("True", set(data_test["turn_belief"][batch_idx]))
                     print("Pred", set(predict_belief_bsz_ptr), "\n")
 
@@ -329,7 +337,19 @@ class TRADE(torch.nn.Module):
             json.dump(all_predictions, open(
                 "all_prediction_{}.json".format(self.name), 'w'), indent=2)
 
-        joint_acc_score, turn_acc_score, joint_F1_score = self.evaluate_metrics(all_predictions, "pred_beliefstate_ptr", slots)
+        joint_acc_score, turn_acc_score, joint_F1_score, individual_slot_scores, joint_success, missing_slots, incorrect_slots = self.evaluate_metrics(
+            all_predictions, "pred_beliefstate_ptr", slots)
+
+        # ANALYSIS: print out results from individual slot analysis, and joint analysis
+        # print("JOINT SUCCESS:")
+        # for k in list(joint_success.keys())[:20]:
+        #     print(f"{k} - {joint_success[k]}")
+        # print(f"\nJOINT FAILURE - MISSING SLOTS:")
+        # for k in list(missing_slots.keys())[:20]:
+        #     print(f"{k} - {missing_slots[k]}")
+        # print(f"\nJOINT FAILURE - INCORRECT SLOTS:")
+        # for k in list(incorrect_slots.keys())[:20]:
+        #     print(f"{k} - {incorrect_slots[k]}")
 
         evaluation_metrics = {
             "Joint_accuracy": joint_acc_score,
@@ -337,7 +357,15 @@ class TRADE(torch.nn.Module):
             "Joint F1": joint_F1_score
         }
         if logger:
-            logger.logger['testing'].append(['evaluation', evaluation_metrics])
+            logger.logger['testing'].append([['evaluation', evaluation_metrics],
+                                             ['individual_slot_scores', individual_slot_scores],
+                                             ['unique_joint_slots_success', len(joint_success)],
+                                             ['top_100_joint_success', joint_success],
+                                             ['unique_missing_slots', len(missing_slots)],
+                                             ['top_50_missing_slots', missing_slots],
+                                             ['unique_incorrect_slots', len(incorrect_slots)],
+                                             ['top_50_incorrect_slots', incorrect_slots]
+                                             ])
         print(evaluation_metrics)
 
     def evaluate_metrics(self, all_predictions, from_which, slots):
@@ -346,13 +374,55 @@ class TRADE(torch.nn.Module):
         :param from_which: which prediction method are we comparing
         :param slots: domain-slot names
         """
+        # ANALYSIS
+        individual_slot_scores = {
+            slot: {
+                "TP": 0,
+                "FP": 0,
+                "FN": 0}
+            for slot in slots}
+        joint_success = {}
+        joint_failure = {"missing_slots": {}, "incorrect_slots": {}}
+
         total, turn_acc, joint_acc, F1_pred, F1_count = 0, 0, 0, 0, 0
 
         for datum_ID, turns in all_predictions.items():
             for turn_idx, turn in turns.items():
+
+                # ANALYSIS: compute score for each slot individually
+                for slot in turn['turn_belief']:
+                    if slot in turn[from_which]:
+                        individual_slot_scores[slot.rsplit("-", 1)[0]]["TP"] += 1
+                    else:
+                        individual_slot_scores[slot.rsplit("-", 1)[0]]["FN"] += 1
+                for slot in turn[from_which]:
+                    if slot not in turn['turn_belief']:
+                        individual_slot_scores[slot.rsplit("-", 1)[0]]["FP"] += 1
+
                 # compute joint goal accuracy per turn
                 if set(turn['turn_belief']) == set(turn[from_which]):
                     joint_acc += 1
+                    # ANALYSIS on succesful joint accuracy
+                    if str(turn['turn_belief']) not in joint_success.keys():
+                        joint_success[str(turn['turn_belief'])] = 1
+                    else:
+                        joint_success[str(turn['turn_belief'])] += 1
+                # ANALYSIS on failed joint accuracy
+                else:
+                    missing_slots = set(turn['turn_belief'])-set(turn[from_which])
+                    for slot in missing_slots:
+                        if slot not in joint_failure['missing_slots'].keys():
+                            joint_failure["missing_slots"][slot] = 1
+                        else:
+                            joint_failure["missing_slots"][slot] += 1
+
+                    incorrect_slots = set(turn[from_which])-set(turn['turn_belief'])
+                    for slot in incorrect_slots:
+                        if slot not in joint_failure['incorrect_slots'].keys():
+                            joint_failure["incorrect_slots"][slot] = 1
+                        else:
+                            joint_failure["incorrect_slots"][slot] += 1
+
                 total += 1
 
                 # compute slot accuracy
@@ -370,7 +440,11 @@ class TRADE(torch.nn.Module):
         # F1 is calculated jointly across all slots in a single turn
         F1_score = F1_pred/total if total > 0 else 0
 
-        return joint_accuracy, turn_accuracy, F1_score
+        joint_success = {k: v for k, v in sorted(joint_success.items(), key=lambda item: item[1], reverse=True)}
+        missing_slots = {k: v for k, v in sorted(joint_failure['missing_slots'].items(), key=lambda item: item[1], reverse=True)}
+        incorrect_slots = {k: v for k, v in sorted(joint_failure['incorrect_slots'].items(), key=lambda item: item[1], reverse=True)}
+
+        return joint_accuracy, turn_accuracy, F1_score, individual_slot_scores, joint_success, missing_slots, incorrect_slots
 
     def compute_slot_acc(self, gold, pred, slots):
         FN = 0
