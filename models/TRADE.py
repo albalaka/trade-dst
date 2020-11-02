@@ -213,7 +213,7 @@ class TRADE(torch.nn.Module):
 
         return all_point_outputs, all_gate_outputs, words_pointer_output
 
-    def evaluate(self, dev, slots, metric_best=None, logger=None, early_stopping=True):
+    def evaluate(self, dev, slots, eval_slots, metric_best=None, logger=None, early_stopping=True):
         print("EVALUATING ON DEV")
         all_predictions = {}
         inverse_gating_dict = dict([(v, k) for k, v in self.gating_dict.items()])
@@ -263,7 +263,7 @@ class TRADE(torch.nn.Module):
                 "all_prediction_{}.json".format(self.name), 'w'), indent=2)
 
         joint_acc_score, turn_acc_score, joint_F1_score, individual_slot_scores, joint_success, FN_slots, FP_slots = self.evaluate_metrics(
-            all_predictions, "pred_beliefstate_ptr", slots)
+            all_predictions, "pred_beliefstate_ptr", eval_slots)
 
         evaluation_metrics = {
             "Joint_accuracy": joint_acc_score,
@@ -291,7 +291,7 @@ class TRADE(torch.nn.Module):
                 self.save_model('ACC-{:.4f}'.format(joint_acc_score))
             return joint_acc_score
 
-    def test(self, test, slots, logger=None):
+    def test(self, test, slots, eval_slots, logger=None):
         print("EVALUATING ON TEST")
         all_predictions = {}
         inverse_gating_dict = dict([(v, k) for k, v in self.gating_dict.items()])
@@ -338,7 +338,7 @@ class TRADE(torch.nn.Module):
                 "all_prediction_{}.json".format(self.name), 'w'), indent=2)
 
         joint_acc_score, turn_acc_score, joint_F1_score, individual_slot_scores, joint_success, FN_slots, FP_slots = self.evaluate_metrics(
-            all_predictions, "pred_beliefstate_ptr", slots)
+            all_predictions, "pred_beliefstate_ptr", eval_slots)
 
         # ANALYSIS: print out results from individual slot analysis, and joint analysis
         # print("JOINT SUCCESS:")
@@ -368,11 +368,11 @@ class TRADE(torch.nn.Module):
                                         }
         print(evaluation_metrics)
 
-    def evaluate_metrics(self, all_predictions, from_which, slots):
+    def evaluate_metrics(self, all_predictions, from_which, evaluation_slots):
         """
         :param all_predictions: dict of dialogues, each dialogue contains turns with ground truth turn beliefs and predicted beliefs
         :param from_which: which prediction method are we comparing
-        :param slots: domain-slot names
+        :param evaluation_slots: domain-slot names to test on
         """
         # ANALYSIS
         individual_slot_scores = {
@@ -380,7 +380,7 @@ class TRADE(torch.nn.Module):
                 "TP": 0,
                 "FP": 0,
                 "FN": 0}
-            for slot in slots}
+            for slot in evaluation_slots}
         joint_success = {}
         joint_failure = {"FN_slots": {}, "FP_slots": {}}
 
@@ -388,39 +388,46 @@ class TRADE(torch.nn.Module):
 
         for datum_ID, turns in all_predictions.items():
             for turn_idx, turn in turns.items():
+                turn_belief = [belief for belief in turn['turn_belief'] if belief.rsplit("-", 1)[0] in evaluation_slots]
+                pred_beliefs = [belief for belief in turn[from_which] if belief.rsplit("-", 1)[0] in evaluation_slots]
 
                 # ANALYSIS: compute score for each slot individually
-                for slot in turn['turn_belief']:
+                for slot in turn_belief:
+                    if slot.rsplit("-", 1)[0] not in evaluation_slots:
+                        continue
                     # For some reason, in PMUL2256, the last turn contains a slot labeled as hospital
                     #   it is clearly mislabeled, but I don't want to pull it from the dataset
                     if 'hospital' in slot:
                         continue
-                    if slot in turn[from_which]:
+
+                    # TODO: to track which slot values are most found correct/incorrect, add a bit here
+                    if slot in pred_beliefs:
                         individual_slot_scores[slot.rsplit("-", 1)[0]]["TP"] += 1
                     else:
                         individual_slot_scores[slot.rsplit("-", 1)[0]]["FN"] += 1
-                for slot in turn[from_which]:
-                    if slot not in turn['turn_belief']:
+                for slot in pred_beliefs:
+                    if slot not in turn_belief:
                         individual_slot_scores[slot.rsplit("-", 1)[0]]["FP"] += 1
 
                 # compute joint goal accuracy per turn
-                if set(turn['turn_belief']) == set(turn[from_which]):
+                if set(turn_belief) == set(pred_beliefs):
                     joint_acc += 1
                     # ANALYSIS on succesful joint accuracy
-                    if str(turn['turn_belief']) not in joint_success.keys():
-                        joint_success[str(turn['turn_belief'])] = 1
+                    if str(turn_belief) not in joint_success.keys():
+                        joint_success[str(turn_belief)] = 1
                     else:
-                        joint_success[str(turn['turn_belief'])] += 1
+                        joint_success[str(turn_belief)] += 1
+
                 # ANALYSIS on failed joint accuracy
                 else:
-                    FN_slots = set(turn['turn_belief'])-set(turn[from_which])
+                    FN_slots = set(turn_belief)-set(pred_beliefs)
                     for slot in FN_slots:
                         if slot not in joint_failure['FN_slots'].keys():
                             joint_failure["FN_slots"][slot] = 1
                         else:
                             joint_failure["FN_slots"][slot] += 1
 
-                    FP_slots = set(turn[from_which])-set(turn['turn_belief'])
+                    FP_slots = set(pred_beliefs)-set(turn_belief)
                     for slot in FP_slots:
                         if slot not in joint_failure['FP_slots'].keys():
                             joint_failure["FP_slots"][slot] = 1
@@ -430,11 +437,11 @@ class TRADE(torch.nn.Module):
                 total += 1
 
                 # compute slot accuracy
-                temp_acc = self.compute_slot_acc(set(turn['turn_belief']), set(turn[from_which]), slots)
+                temp_acc = self.compute_slot_acc(set(turn_belief), set(pred_beliefs), evaluation_slots)
                 turn_acc += temp_acc
 
                 # compute joint F1 score
-                temp_F1, temp_recall, temp_precision = self.compute_precision_recall_F1(set(turn['turn_belief']), set(turn[from_which]))
+                temp_F1, temp_recall, temp_precision = self.compute_precision_recall_F1(set(turn_belief), set(pred_beliefs))
                 F1_pred += temp_F1
 
         # joint accuracy requires the each slot within a turn to be correct to get a point
