@@ -75,7 +75,7 @@ def main(**kwargs):
 
         if ((epoch+1) % kwargs['eval_patience']) == 0:
             model.eval()
-            accuracy = model.evaluate(dev, slot_list[2], avg_best, logger, kwargs['early_stopping'])
+            accuracy = model.evaluate(dev, slot_list[2], kwargs['eval_slots'], avg_best, logger, kwargs['early_stopping'])
             model.train()
             scheduler.step(accuracy)
 

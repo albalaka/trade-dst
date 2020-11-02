@@ -8,7 +8,6 @@ import utils.utils
 
 
 def main(**kwargs):
-
     logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
     _, _, test, lang, slot_list, gating_dict, _ = prepare_data(training=False, **kwargs)
@@ -16,7 +15,7 @@ def main(**kwargs):
     model = TRADE(lang, slot_list, gating_dict, **kwargs)
     model.eval()
 
-    model.test(test, slot_list[3], logger)
+    model.test(test, slot_list[3], kwargs['eval_slots'], logger)
 
     if logger:
         logger.save()
