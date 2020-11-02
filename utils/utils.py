@@ -9,7 +9,11 @@ ENT_token = 4
 
 MAX_GPU_SAMPLES = 4
 BINARY_SLOTS = ['hotel-parking', 'hotel-internet']
-CATEGORICAL_SLOTS = ['hotel-pricerange', 'hotel-stars', 'restaurant-pricerange']
+# CATEGORICAL_SLOTS = ['hotel-pricerange', 'hotel-book day', 'train-day', 'hotel-stars', 'restaurant-food', 'restaurant-pricerange', 'restaurant-book day']
+CATEGORICAL_SLOTS = ['hotel-pricerange', 'hotel-book day', 'hotel-stars', 'hotel-area',
+                     'train-day',
+                     'attraction-area',
+                     'restaurant-food', 'restaurant-pricerange', 'restaurant-area', 'restaurant-book day']
 ALL_SLOTS = ['hotel-pricerange', 'hotel-type', 'hotel-parking', 'hotel-book stay', 'hotel-book day', 'hotel-book people',
              'hotel-area', 'hotel-stars', 'hotel-internet', 'train-destination', 'train-day', 'train-departure',
              'train-arriveby', 'train-book people', 'train-leaveat', 'attraction-area', 'restaurant-food',
@@ -48,6 +52,11 @@ def parse_args():
     parser.add_argument('--no_binary_slots', action='store_true')
     parser.add_argument('--only_binary_slots', action='store_true')
     parser.add_argument('--no_categorical_slots', action='store_true')
+    parser.add_argument('--no_binary_evaluation', action='store_true', help="remove binary slots from test/evaluate")
+    parser.add_argument('--only_binary_evaluation', action='store_true')
+    parser.add_argument('--no_categorical_evaluation', action='store_true')
+    parser.add_argument('--only_categorical_evaluation', action='store_true')
+    parser.add_argument('--boosted_NER_labels',action='store_true')
 
     args = parser.parse_args()
 
@@ -72,5 +81,18 @@ def parse_args():
         args.drop_slots = ALL_SLOTS
         for slot in BINARY_SLOTS:
             args.drop_slots.remove(slot)
+
+    setattr(args, "eval_slots", ALL_SLOTS)
+    if args.only_binary_evaluation:
+        args.eval_slots = BINARY_SLOTS
+    if args.only_categorical_evaluation:
+        args.eval_slots = CATEGORICAL_SLOTS
+    if args.no_binary_evaluation:
+        for slot in BINARY_SLOTS:
+            args.eval_slots.remove(slot)
+    if args.no_categorical_evaluation:
+        for slot in CATEGORICAL_SLOTS:
+            args.eval_slots.remove(slot)
+    # print(f"Evaluating on {args.eval_slots}")
 
     return vars(args)
