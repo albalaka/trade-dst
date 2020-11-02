@@ -68,7 +68,7 @@ class Lang():
 
 
 def read_language(dataset_path, gating_dict, slots, dataset, language, mem_language,
-                  ENT_token=None, ground_truth_labels=False, NER_labels=False, percent_ground_truth=100, only_domain='',
+                  ENT_token=None, ground_truth_labels=False, NER_labels=False, boosted_NER_labels=False, percent_ground_truth=100, only_domain='',
                   except_domain='', data_ratio=100, drop_slots=None):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to a json dataset (rg. data/train_dials.json)
@@ -139,7 +139,6 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
             #       or we can add labels from only user utterance, try both
             if NER_labels:
                 dialogue_history = dialogue_history[:-3]
-
                 # append entities from the user utterance
                 res = ner(turn['transcript'])
                 for word in res:
@@ -150,9 +149,22 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
 
                 dialogue_history += " ; "
 
+            if boosted_NER_labels:
+                dialogue_history = dialogue_history[:-3]
+                res = ner(turn['transcript'])
+                for word in res:
+                    if word.ent_iob_ == "B":
+                        dialogue_history += f" {ENT_token} {word}"
+                    if word.ent_iob == "I":
+                        dialogue_history += f" {word}"
+                for domain_slot, value in turn['turn_label']:
+                    if domain_slot in ['hotel-parking', 'hotel-internet']:
+                        dialogue_history += f" {ENT_token} {value}"
+
+                dialogue_history += " ; "
+
             source_text = dialogue_history.strip()
-            turn_belief_dict = fix_general_label_error(
-                turn['belief_state'], slots, drop_slots)
+            turn_belief_dict = fix_general_label_error(turn['belief_state'], slots, drop_slots)
 
             # For training/testing on separate domains
             # Generate domain-dependent slot list
@@ -270,10 +282,8 @@ def dump_pretrained_emb(word2index, index2word, dump_path):
 
 
 def get_slot_information(ontology, drop_slots=[]):
-    ontology_domains = dict(
-        [(k, v) for k, v in ontology.items() if k.split("-")[0] in EXPERIMENT_DOMAINS])
-    slots = [k.replace(" ", "").lower() if ("book" not in k)
-             else k.lower() for k in ontology_domains.keys()]
+    ontology_domains = dict([(k, v) for k, v in ontology.items() if k.split("-")[0] in EXPERIMENT_DOMAINS])
+    slots = [k.replace(" ", "").lower() if ("book" not in k) else k.lower() for k in ontology_domains.keys()]
     slots = [slot for slot in slots if slot not in drop_slots]
     return slots
 
@@ -321,6 +331,7 @@ def prepare_data(training, **kwargs):
         data_train, max_len_train, slot_train = read_language(file_train, gating_dict, all_slots, "train", lang, mem_lang,
                                                               ground_truth_labels=kwargs['ground_truth_labels'],
                                                               NER_labels=kwargs['NER_labels'],
+                                                              boosted_NER_labels=kwargs['boosted_NER_labels'],
                                                               ENT_token=lang.index2word[kwargs['ENT_token']],
                                                               percent_ground_truth=kwargs['percent_ground_truth'],
                                                               data_ratio=kwargs['train_data_ratio'],
@@ -332,6 +343,7 @@ def prepare_data(training, **kwargs):
         data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang,
                                                         ground_truth_labels=kwargs['ground_truth_labels'],
                                                         NER_labels=kwargs['NER_labels'],
+                                                        boosted_NER_labels=kwargs['boosted_NER_labels'],
                                                         ENT_token=lang.index2word[kwargs['ENT_token']],
                                                         percent_ground_truth=kwargs['percent_ground_truth'],
                                                         data_ratio=kwargs['dev_data_ratio'],
@@ -382,6 +394,7 @@ def prepare_data(training, **kwargs):
                                                            lang, mem_lang,
                                                            ground_truth_labels=kwargs['ground_truth_labels'],
                                                            NER_labels=kwargs['NER_labels'],
+                                                           boosted_NER_labels=kwargs['boosted_NER_labels'],
                                                            ENT_token=lang.index2word[kwargs['ENT_token']],
                                                            percent_ground_truth=kwargs['percent_ground_truth'],
                                                            data_ratio=kwargs['test_data_ratio'],
@@ -445,8 +458,7 @@ def fix_general_label_error(labels, slots, drop_slots):
         if slot in label_dict.keys():
             # general typos
             if label_dict[slot] in GENERAL_TYPO.keys():
-                label_dict[slot] = label_dict[slot].replace(
-                    label_dict[slot], GENERAL_TYPO[label_dict[slot]])
+                label_dict[slot] = label_dict[slot].replace(label_dict[slot], GENERAL_TYPO[label_dict[slot]])
 
             # miss match slot and value
             if slot == "hotel-type" and label_dict[slot] in ["nigh", "moderate -ly priced", "bed and breakfast", "centre", "venetian", "intern", "a cheap -er hotel"] or \
