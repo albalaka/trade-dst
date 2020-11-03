@@ -34,9 +34,9 @@ class Lang():
 
     def __init__(self, PAD_token, SOS_token, EOS_token, UNK_token, ENT_token):
         self.word2index = {}
-        self.index2word = {PAD_token: "<PAD>", SOS_token: "<SOS>",
-                           EOS_token: "<EOS>", UNK_token: "<UNK>",
-                           ENT_token: "<ENT>"}
+        self.index2word = {PAD_token: "PAD", SOS_token: "SOS",
+                           EOS_token: "EOS", UNK_token: "UNK",
+                           ENT_token: "ENT"}
         self.n_words = len(self.index2word)  # Count default tokens
         self.word2index = dict([(v, k) for k, v in self.index2word.items()])
 
@@ -365,8 +365,7 @@ def prepare_data(training, **kwargs):
 
         # else dump the newly calculated languages
         else:
-            print(
-                f"Dumping language files to {os.path.join(lang_path, lang_name)}")
+            print(f"Dumping language files to {os.path.join(lang_path, lang_name)}")
             with open(os.path.join(lang_path, lang_name), 'wb') as p:
                 pkl.dump(lang, p)
             with open(os.path.join(lang_path, mem_lang_name), 'wb') as p:
