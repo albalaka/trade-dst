@@ -1,6 +1,12 @@
 import json
 import os
 
+# TODO: This file needs a lot of cleanup
+#       the file should be less focused on analyzing
+#       training results, and more focused on analyzing differences
+#       between testing results of different methods
+
+
 # Functions for loading data
 def load_log(log_name):
     return json.load(open(os.path.join("logs", log_name)))
@@ -31,6 +37,8 @@ def get_training_data(experiment_ID):
     return training_data
 
 # Function for getting training loss
+
+
 def get_training_loss(experiment_ID):
     training_data = get_training_data(experiment_ID)
     loss = []
@@ -48,6 +56,8 @@ def get_evaluation_data(experiment_ID):
     return eval_data
 
 # Functions for evaluation metrics - Joint accuracy, Turn accuracy, Joint F1 score
+
+
 def get_single_eval_metric(eval_dict):
     """
     Takes as input a single evaluation dict
@@ -73,6 +83,8 @@ def get_all_evaluation_eval_metrics(experiment_ID):
     return joint_accs, turn_accs, joint_F1s
 
 # Functions for getting TP, FP, FN for each domain-slot pair
+
+
 def get_single_slot_scores(eval_dict):
     """
     Slot scores are the number of TP, FP, and FN for an individual slot (eg. hotel-pricerange)
@@ -80,6 +92,7 @@ def get_single_slot_scores(eval_dict):
             {'hotel-pricerange': {'TP': 10,'FP':5,'FN':4}, 'hotel-parking': {'TP':0,'FP':10,'FN':5}, etc.)
     """
     return eval_dict['individual_slot_scores']
+
 
 def get_testing_slot_scores(experiment_ID):
     test_data = get_testing_data(experiment_ID)
@@ -111,6 +124,8 @@ def get_all_evaluation_slot_scores(experiment_ID):
 
 # Functions for getting (possibly multiple) successful joint domain-slot-value pairs
 # These are pairs that all must be correct to count towards joint accuracy
+
+
 def get_single_unique_joint_slot_success(eval_dict):
     """
     A single joint success is when all slots were correctly labeled
@@ -153,9 +168,9 @@ def get_final_top_k_joint_slot_success(experiment_ID, k):
     eval_data = get_evaluation_data(experiment_ID)
     return get_single_top_k_joint_slot_success(eval_data[-1], k)
 
+
 def get_testing_joint_slot_succes(experiment_ID):
     test_data = get_testing_data(experiment_ID)
-
 
 
 def get_all_evaluation_top_k_joint_slot_successes(experiment_ID, k):
@@ -191,6 +206,8 @@ def get_all_evaluation_individual_joint_slot_success(experiment_ID, slot):
     return individual_joint_slot_successes
 
 # Functions for getting FN slots
+
+
 def get_single_unique_FN_slots(eval_dict):
     """
     An FN slot is a slot value that existed in the ground truth, but was not correctly labeled
@@ -247,6 +264,8 @@ def get_all_evaluation_individual_FN_slot(experiment_ID, slot):
     return individual_FN_slot
 
 # Functions for getting FP slots
+
+
 def get_single_unique_FP_slots(eval_dict):
     """
     An FP slot is a slot value that was labelled by the DST, but not the same label as the ground truth
