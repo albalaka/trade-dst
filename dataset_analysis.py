@@ -5,7 +5,12 @@ from tqdm import tqdm
 import utils.utils
 
 import en_core_web_sm
+import en_core_web_md
+import en_core_web_lg
+
 ner = en_core_web_sm.load()
+ner_md = en_core_web_md.load()
+ner_lg = en_core_web_lg.load()
 
 kwargs = utils.utils.parse_args()
 
@@ -61,14 +66,102 @@ def compare_GT_NER_labels(file):
                 for word in res:
                     if word.ent_iob_ == "B":
                         NER.append(str(word))
-                    if word.ent_iob_ == "I" and str(word) not in ['night', 'nights', 'day', 'days']:
+                    if word.ent_iob_ == "I":
                         NER[-1] = f"{NER[-1]} {word}"
 
-                for i, ent in enumerate(NER):
-                    if ent[:5] == 'about':
-                        NER[i] = ent[6:]
-                    elif ent in GENERAL_TYPO.keys():
-                        NER[i] = GENERAL_TYPO[ent]
+                # for i, ent in enumerate(NER):
+                #     if ent[:5] == 'about':
+                #         NER[i] = ent[6:]
+                #     elif ent in GENERAL_TYPO.keys():
+                #         NER[i] = GENERAL_TYPO[ent]
+
+                # tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_single_turn_GT_NER_labels(GT, NER)
+                tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_NER_IN_GT(GT, NER)
+                TP += tmp_TP
+                samples_TP.extend(tmp_samples_TP)
+                FP += tmp_FP
+                samples_FP.extend(tmp_samples_FP)
+                FN += tmp_FN
+                samples_FN.extend(tmp_samples_FN)
+
+    print(f"TP: {TP} FN: {FN} FP: {FP}")
+    print("recall: {}".format(TP/(TP+FN)))
+    print("precision: {}".format(TP/(TP+FP)))
+    return TP, samples_TP, FP, samples_FP, FN, samples_FN
+
+
+def compare_GT_NER_labels_md(file):
+    TP, FP, FN = 0, 0, 0
+    samples_TP, samples_FP, samples_FN = [], [], []
+    dialogues = json.load(open(file))
+    for dialogue_dict in tqdm(dialogues):
+        # for dialogue_dict in dialogues:
+        skip = False
+        # skip police and hospital domains
+        for domain in dialogue_dict['domains']:
+            if domain not in EXPERIMENT_DOMAINS:
+                skip = True
+
+        if not skip:
+            for turn in dialogue_dict['dialogue']:
+                GT = [v for ds, v in turn['turn_label']]
+                res = ner_md(turn['transcript'])
+                NER = []
+                for word in res:
+                    if word.ent_iob_ == "B":
+                        NER.append(str(word))
+                    if word.ent_iob_ == "I":
+                        NER[-1] = f"{NER[-1]} {word}"
+
+                # for i, ent in enumerate(NER):
+                #     if ent[:5] == 'about':
+                #         NER[i] = ent[6:]
+                #     elif ent in GENERAL_TYPO.keys():
+                #         NER[i] = GENERAL_TYPO[ent]
+
+                # tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_single_turn_GT_NER_labels(GT, NER)
+                tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_NER_IN_GT(GT, NER)
+                TP += tmp_TP
+                samples_TP.extend(tmp_samples_TP)
+                FP += tmp_FP
+                samples_FP.extend(tmp_samples_FP)
+                FN += tmp_FN
+                samples_FN.extend(tmp_samples_FN)
+
+    print(f"TP: {TP} FN: {FN} FP: {FP}")
+    print("recall: {}".format(TP/(TP+FN)))
+    print("precision: {}".format(TP/(TP+FP)))
+    return TP, samples_TP, FP, samples_FP, FN, samples_FN
+
+
+def compare_GT_NER_labels_lg(file):
+    TP, FP, FN = 0, 0, 0
+    samples_TP, samples_FP, samples_FN = [], [], []
+    dialogues = json.load(open(file))
+    for dialogue_dict in tqdm(dialogues):
+        # for dialogue_dict in dialogues:
+        skip = False
+        # skip police and hospital domains
+        for domain in dialogue_dict['domains']:
+            if domain not in EXPERIMENT_DOMAINS:
+                skip = True
+
+        if not skip:
+            for turn in dialogue_dict['dialogue']:
+                GT = [v for ds, v in turn['turn_label']]
+                res = ner_lg(turn['transcript'])
+                NER = []
+                for word in res:
+                    if word.ent_iob_ == "B":
+                        NER.append(str(word))
+                    if word.ent_iob_ == "I":
+                        NER[-1] = f"{NER[-1]} {word}"
+
+                # for i, ent in enumerate(NER):
+                #     if ent[:5] == 'about':
+                #         NER[i] = ent[6:]
+                #     elif ent in GENERAL_TYPO.keys():
+                #         NER[i] = GENERAL_TYPO[ent]
 
                 # tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_single_turn_GT_NER_labels(GT, NER)
                 tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_NER_IN_GT(GT, NER)
@@ -191,6 +284,7 @@ def view_multiwoz_metadata():
     test_slots, test_total_turns, test_empty_turns = get_slot_values(file_test)
 
     combined_slots = {}
+    total_slot_values = 0
     for slot_set in [train_slots, dev_slots, test_slots]:
         for ds in slot_set:
             if ds not in combined_slots.keys():
@@ -200,22 +294,26 @@ def view_multiwoz_metadata():
                     combined_slots[ds][v] = slot_set[ds][v]
                 else:
                     combined_slots[ds][v] += slot_set[ds][v]
+                total_slot_values += slot_set[ds][v]
 
     combined_slots = {ds: {k: v for k, v in sorted(combined_slots[ds].items(), key=lambda item: item[1], reverse=True)} for ds in combined_slots}
 
     print("OVERVIEW".ljust(30), "# train/dev/test")
     print(f"Total turns \t\t\t{train_total_turns} {dev_total_turns} {test_total_turns}")
     print(f"Empty turns \t\t\t{train_empty_turns} {dev_empty_turns} {test_empty_turns}")
-    print("\nSamples per slot type:".ljust(30), "# train/dev/test".ljust(30), "# unique values")
+    print("\nSamples per slot type:".ljust(30), "# train/dev/test".ljust(20), "# unique values".ljust(20), "Percent of total slots")
     for slot in train_slots:
-        print(f"{slot: <30}\t{sum(train_slots[slot].values())}/{sum(dev_slots[slot].values())}/{sum(test_slots[slot].values()): <30}{len(combined_slots[slot])}")
+        tot_single_slot = sum(train_slots[slot].values())+sum(dev_slots[slot].values())+sum(test_slots[slot].values())
+        print(
+            f"{slot: <30}\t{sum(train_slots[slot].values())}/{sum(dev_slots[slot].values())}/{sum(test_slots[slot].values()): <15}{len(combined_slots[slot]): <15}{tot_single_slot/total_slot_values: .3f}")
 
     print("\nDETAILS")
-    print("Most frequent values per slot".ljust(30), "VALUE".ljust(10), "COUNT".ljust(10), "PERCENT")
+    print("Most frequent values per slot".ljust(30), "VALUE".ljust(10), "COUNT".ljust(10), "PERCENT".ljust(10), "PERCENT ALL TURNS")
     for slot in train_slots:
         print(f"\n{slot}")
         for k in list(combined_slots[slot].keys())[:10]:
-            print(f"{k: >35} {combined_slots[slot][k]: >10} {combined_slots[slot][k]/sum(combined_slots[slot].values()):>10.2f}")
+            print(
+                f"{k: >35} {combined_slots[slot][k]: >10} {combined_slots[slot][k]/sum(combined_slots[slot].values()):>10.2f} {combined_slots[slot][k]/(train_total_turns+dev_total_turns+test_total_turns):>10.2f}")
 
 # def GT_in_turn(file):
 #     dialogues = json.load(open(file))
