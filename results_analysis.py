@@ -1,7 +1,7 @@
 import json
 import os
 
-
+# Functions for loading data
 def load_log(log_name):
     return json.load(open(os.path.join("logs", log_name)))
 
@@ -10,29 +10,51 @@ def get_metadata(experiment_ID):
     return load_log(experiment_ID)['metadata']
 
 
-def get_training_data(experiment_ID):
-    return load_log(experiment_ID)['training']
+def get_training_evaluation_data(experiment_ID):
+    log = load_log(experiment_ID)['training']
+    training_data = []
+    eval_data = []
+    for batch in log:
+        if batch[0] == 'evaluation':
+            eval_data.append(batch[1])
+        else:
+            training_data.append(batch[1])
+    return training_data, eval_data
 
 
 def get_testing_data(experiment_ID):
     return load_log(experiment_ID)['testing']
 
 
+def get_training_data(experiment_ID):
+    training_data, _ = get_training_evaluation_data(experiment_ID)
+    return training_data
+
+# Function for getting training loss
+def get_training_loss(experiment_ID):
+    training_data = get_training_data(experiment_ID)
+    loss = []
+    loss_ptr = []
+    loss_gate = []
+    for batch in training_data:
+        loss.append(batch["loss"])
+        loss_ptr.append(batch["loss_pointer"])
+        loss_gate.append(batch["loss_gate"])
+    return loss, loss_ptr, loss_gate
+
+
 def get_evaluation_data(experiment_ID):
-    log = get_training_data(experiment_ID)
-    eval_data = []
-    for batch in log:
-        if batch[0] == 'evaluation':
-            eval_data.append(batch[1])
+    _, eval_data = get_training_evaluation_data(experiment_ID)
     return eval_data
 
-
+# Functions for evaluation metrics - Joint accuracy, Turn accuracy, Joint F1 score
 def get_single_eval_metric(eval_dict):
     """
     Takes as input a single evaluation dict
     Returns just the evaluation_metrics portion
     """
-    return eval_dict['Joint_accuracy'], eval_dict['Turn accuracy'], eval_dict['Joint F1']
+    eval_metrics = eval_dict['evaluation_metrics']
+    return eval_metrics['Joint_accuracy'], eval_metrics['Turn accuracy'], eval_metrics['Joint F1']
 
 
 def get_all_evaluation_eval_metrics(experiment_ID):
@@ -50,7 +72,7 @@ def get_all_evaluation_eval_metrics(experiment_ID):
 
     return joint_accs, turn_accs, joint_F1s
 
-
+# Functions for getting TP, FP, FN for each domain-slot pair
 def get_single_slot_scores(eval_dict):
     """
     Slot scores are the number of TP, FP, and FN for an individual slot (eg. hotel-pricerange)
@@ -58,6 +80,10 @@ def get_single_slot_scores(eval_dict):
             {'hotel-pricerange': {'TP': 10,'FP':5,'FN':4}, 'hotel-parking': {'TP':0,'FP':10,'FN':5}, etc.)
     """
     return eval_dict['individual_slot_scores']
+
+def get_testing_slot_scores(experiment_ID):
+    test_data = get_testing_data(experiment_ID)
+    return get_single_slot_scores(test_data)
 
 
 def get_all_evaluation_slot_scores(experiment_ID):
@@ -71,16 +97,20 @@ def get_all_evaluation_slot_scores(experiment_ID):
     eval_data = get_evaluation_data(experiment_ID)
     # convert raw evaluation metrics into a list of just slot scores
     slot_scores = [get_single_slot_scores(e) for e in eval_data]
-    reorganized_slot_scores = {e: {"TP": [], "FP": [], "FN": []} for e in slot_scores[0]}
+    reorganized_slot_scores = {e: {"TP": [], "FP": [], "FN": [], "F1": []} for e in slot_scores[0]}
     # reorganize slot scores from a per-epoch basis to a per-score basis
     for scores in slot_scores:
         for slot in scores:
             reorganized_slot_scores[slot]["TP"].append(scores[slot]["TP"])
             reorganized_slot_scores[slot]["FP"].append(scores[slot]["FP"])
             reorganized_slot_scores[slot]["FN"].append(scores[slot]["FN"])
+            reorganized_slot_scores[slot]["F1"].append(
+                scores[slot]["TP"]/(scores[slot]["TP"]+(scores[slot]["FP"]+scores[slot]["FN"])/2)
+            )
     return reorganized_slot_scores
 
-
+# Functions for getting (possibly multiple) successful joint domain-slot-value pairs
+# These are pairs that all must be correct to count towards joint accuracy
 def get_single_unique_joint_slot_success(eval_dict):
     """
     A single joint success is when all slots were correctly labeled
@@ -102,6 +132,30 @@ def get_single_top_k_joint_slot_success(eval_dict, k):
     """
     js = eval_dict['joint_success']
     return {k: js[k] for k in list(js.keys())[:k]}
+
+
+def get_first_top_k_joint_slot_success(experiment_ID, k):
+    """
+    :param experiment_ID: path of log.json file
+    Returns a dict of all joint slots successfully labeled and their frequencies
+        for the first evaluation
+    """
+    eval_data = get_evaluation_data(experiment_ID)
+    return get_single_top_k_joint_slot_success(eval_data[0], k)
+
+
+def get_final_top_k_joint_slot_success(experiment_ID, k):
+    """
+    :param experiment_ID: path of log.json file
+    Returns a dict of all joint slots successfully labeled and their frequencies
+        for the final evaluation
+    """
+    eval_data = get_evaluation_data(experiment_ID)
+    return get_single_top_k_joint_slot_success(eval_data[-1], k)
+
+def get_testing_joint_slot_succes(experiment_ID):
+    test_data = get_testing_data(experiment_ID)
+
 
 
 def get_all_evaluation_top_k_joint_slot_successes(experiment_ID, k):
@@ -136,7 +190,7 @@ def get_all_evaluation_individual_joint_slot_success(experiment_ID, slot):
     individual_joint_slot_successes = [e['joint_success'][slot] if slot in e['joint_success'] else 0 for e in eval_data]
     return individual_joint_slot_successes
 
-
+# Functions for getting FN slots
 def get_single_unique_FN_slots(eval_dict):
     """
     An FN slot is a slot value that existed in the ground truth, but was not correctly labeled
@@ -192,7 +246,7 @@ def get_all_evaluation_individual_FN_slot(experiment_ID, slot):
     individual_FN_slot = [e['FN_slots'][slot] if slot in e['FN_slots'] else 0 for e in eval_data]
     return individual_FN_slot
 
-
+# Functions for getting FP slots
 def get_single_unique_FP_slots(eval_dict):
     """
     An FP slot is a slot value that was labelled by the DST, but not the same label as the ground truth
