@@ -97,7 +97,7 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
     # If we need the BERT_VE model, load it, and the tokenizer
     if appended_labels == 'BERT_VE':
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        ve_model = BertForValueExtraction(from_pretrained='BERT_ValueExtraction_models/bs10_gradacc15_lr1e-5-ACC0.9294')
+        ve_model = BertForValueExtraction(from_pretrained='BERT_ValueExtraction_models/bs20_gradacc15_lr1e-6-ACC0.9032')
         if cuda.is_available():
             ve_model.to('cuda')
             ve_model.eval()
