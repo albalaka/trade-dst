@@ -4,7 +4,11 @@ import json
 import random
 import pickle as pkl
 from torch.utils.data import DataLoader
+from torch import cuda
 from embeddings import GloveEmbedding, KazumaCharEmbedding
+from BertForValueExtraction import BertForValueExtraction
+from transformers import BertTokenizer
+from tqdm import tqdm
 
 
 import en_core_web_sm
@@ -69,7 +73,7 @@ class Lang():
 
 
 def read_language(dataset_path, gating_dict, slots, dataset, language, mem_language,
-                  ENT_token=None, ground_truth_labels=False, NER_labels=False, boosted_NER_labels=False, percent_ground_truth=100, only_domain='',
+                  ENT_token=None, appended_labels=None, percent_ground_truth=100, only_domain='',
                   except_domain='', data_ratio=100, drop_slots=None):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to a json dataset (rg. data/train_dials.json)
@@ -82,12 +86,21 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
     :param except_domain: specify if training/testing on all except a specific domain
     """
 
+    print("READING DATASET")
     data = []
     max_response_len, max_value_len = 0, 0
     domain_counter = {}
 
     # Load all dialogues in the dataset
     dialogues = json.load(open(dataset_path))
+
+    # If we need the BERT_VE model, load it, and the tokenizer
+    if appended_labels == 'BERT_VE':
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        ve_model = BertForValueExtraction(from_pretrained='BERT_ValueExtraction_models/bs10_gradacc15_lr1e-5-ACC0.9294')
+        if cuda.is_available():
+            ve_model.to('cuda')
+            ve_model.eval()
 
     # create the vocab for this dataset
     for dialogue_dict in dialogues:
@@ -100,7 +113,7 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
         random.Random(10).shuffle(dialogues)
         dialogues = dialogues[:int(len(dialogues)*data_ratio*0.01)]
 
-    for dialogue_dict in dialogues:
+    for dialogue_dict in tqdm(dialogues):
         dialogue_history = ""
 
         # Filter domains - maybe?
@@ -125,21 +138,16 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
             # turn_utterance = turn['system_transcript']+" ; "+turn['transcript']
             # turn_utterance_stripped = turn_utterance.strip()
             dialogue_history += (turn['system_transcript'] +
-                                 " ; "+turn['transcript']+" ; ")
+                                 " ; "+turn['transcript'])
 
             # ADD grount truth labels from this turn
-            if ground_truth_labels:
-                dialogue_history = dialogue_history[:-3]
+            if appended_labels == 'ground_truth':
                 for domain_slot, value in turn['turn_label']:
                     if random.random() <= percent_ground_truth*0.01:
                         dialogue_history += f" {ENT_token} {value}"
-                dialogue_history += " ; "
 
             # IF using NER, add NER labels here
-            # 2 possibilities, we can either add labels from both system and user utterance,
-            #       or we can add labels from only user utterance, try both
-            if NER_labels:
-                dialogue_history = dialogue_history[:-3]
+            if appended_labels == "NER":
                 # append entities from the user utterance
                 res = ner(turn['transcript'])
                 for word in res:
@@ -148,10 +156,8 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
                     if word.ent_iob == "I":
                         dialogue_history += f" {word}"
 
-                dialogue_history += " ; "
-
-            if boosted_NER_labels:
-                dialogue_history = dialogue_history[:-3]
+            # Use NER labels + GT labels for binary slots
+            if appended_labels == "boosted_NER":
                 res = ner(turn['transcript'])
                 for word in res:
                     if word.ent_iob_ == "B":
@@ -162,8 +168,12 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
                     if domain_slot in ['hotel-parking', 'hotel-internet']:
                         dialogue_history += f" {ENT_token} {value}"
 
-                dialogue_history += " ; "
+            if appended_labels == "BERT_VE":
+                values = ve_model.predict_sentence_values(tokenizer, turn['transcript'])
+                for value in values:
+                    dialogue_history += f" {ENT_token} {value}"
 
+            dialogue_history += " ; "
             source_text = dialogue_history.strip()
             turn_belief_dict = fix_general_label_error(turn['belief_state'], slots, drop_slots)
 
@@ -330,10 +340,8 @@ def prepare_data(training, **kwargs):
     if training:
         # Get training data, longest training turn length, slots used in training
         data_train, max_len_train, slot_train = read_language(file_train, gating_dict, all_slots, "train", lang, mem_lang,
-                                                              ground_truth_labels=kwargs['ground_truth_labels'],
-                                                              NER_labels=kwargs['NER_labels'],
-                                                              boosted_NER_labels=kwargs['boosted_NER_labels'],
                                                               ENT_token=lang.index2word[kwargs['ENT_token']],
+                                                              appended_labels=kwargs['appended_labels'],
                                                               percent_ground_truth=kwargs['percent_ground_truth'],
                                                               data_ratio=kwargs['train_data_ratio'],
                                                               drop_slots=kwargs['drop_slots'])
@@ -342,10 +350,8 @@ def prepare_data(training, **kwargs):
 
         # Get dev data, longest dev turn length, slots used in dev
         data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang,
-                                                        ground_truth_labels=kwargs['ground_truth_labels'],
-                                                        NER_labels=kwargs['NER_labels'],
-                                                        boosted_NER_labels=kwargs['boosted_NER_labels'],
                                                         ENT_token=lang.index2word[kwargs['ENT_token']],
+                                                        appended_labels=kwargs['appended_labels'],
                                                         percent_ground_truth=kwargs['percent_ground_truth'],
                                                         data_ratio=kwargs['dev_data_ratio'],
                                                         drop_slots=kwargs['drop_slots'])
@@ -392,10 +398,8 @@ def prepare_data(training, **kwargs):
         # Get test data, longest test turn length, slots used in test
         data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test",
                                                            lang, mem_lang,
-                                                           ground_truth_labels=kwargs['ground_truth_labels'],
-                                                           NER_labels=kwargs['NER_labels'],
-                                                           boosted_NER_labels=kwargs['boosted_NER_labels'],
                                                            ENT_token=lang.index2word[kwargs['ENT_token']],
+                                                           appended_labels=kwargs['appended_labels'],
                                                            percent_ground_truth=kwargs['percent_ground_truth'],
                                                            data_ratio=kwargs['test_data_ratio'],
                                                            drop_slots=kwargs['drop_slots'])
