@@ -46,7 +46,7 @@ python3 test.py --model_path=$MODEL_PATH --log_path=log.json
 
 ## Performance exploration
 
-To train with ground truth labels appended to each utterance, use the --ground_truth_labels flag. Similarly, for NER entities, use --NER_labels
+To train with ground truth labels appended to each utterance, use the --appended_labels=ground_truth flag. Similarly, for NER entities, use --appended_labels=NER
 
 To compare varying amounts of ground truth labels, use the --percent_ground_truth flag
 
