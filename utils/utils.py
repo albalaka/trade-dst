@@ -46,8 +46,6 @@ def parse_args():
     parser.add_argument('--train_data_ratio', type=int, default=100)
     parser.add_argument('--dev_data_ratio', type=int, default=100)
     parser.add_argument('--test_data_ratio', type=int, default=100)
-    parser.add_argument('--ground_truth_labels', action="store_true")
-    parser.add_argument('--NER_labels', action="store_true")
     parser.add_argument('--percent_ground_truth', type=int, default=100)
     parser.add_argument('--no_binary_slots', action='store_true')
     parser.add_argument('--only_binary_slots', action='store_true')
@@ -56,11 +54,10 @@ def parse_args():
     parser.add_argument('--only_binary_evaluation', action='store_true')
     parser.add_argument('--no_categorical_evaluation', action='store_true')
     parser.add_argument('--only_categorical_evaluation', action='store_true')
-    parser.add_argument('--boosted_NER_labels',action='store_true')
+    parser.add_argument('--appended_labels', type=str, default=None,
+                            choices=['NER','ground_truth','boosted_NER','BERT_VE'])
 
     args = parser.parse_args()
-
-    assert(not (args.ground_truth_labels and args.NER_labels)), "Select only one of either ground truth, or NER labels"
 
     setattr(args, 'device', 'cuda' if cuda.is_available() else 'cpu')
     setattr(args, 'UNK_token', UNK_token)
