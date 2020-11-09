@@ -5,12 +5,7 @@ from tqdm import tqdm
 import utils.utils
 
 import en_core_web_sm
-import en_core_web_md
-import en_core_web_lg
-
 ner = en_core_web_sm.load()
-ner_md = en_core_web_md.load()
-ner_lg = en_core_web_lg.load()
 
 kwargs = utils.utils.parse_args()
 
@@ -90,7 +85,7 @@ def compare_GT_NER_labels(file):
     return TP, samples_TP, FP, samples_FP, FN, samples_FN
 
 
-def compare_GT_NER_labels_md(file):
+def compare_GT_NER_labels_BERT(file, BERT_model, tokenizer):
     TP, FP, FN = 0, 0, 0
     samples_TP, samples_FP, samples_FN = [], [], []
     dialogues = json.load(open(file))
@@ -105,13 +100,8 @@ def compare_GT_NER_labels_md(file):
         if not skip:
             for turn in dialogue_dict['dialogue']:
                 GT = [v for ds, v in turn['turn_label']]
-                res = ner_md(turn['transcript'])
-                NER = []
-                for word in res:
-                    if word.ent_iob_ == "B":
-                        NER.append(str(word))
-                    if word.ent_iob_ == "I":
-                        NER[-1] = f"{NER[-1]} {word}"
+                res = ner(turn['transcript'])
+                VAL = BERT_model.predict_sentence_values(tokenizer, turn['transcript'])
 
                 # for i, ent in enumerate(NER):
                 #     if ent[:5] == 'about':
@@ -119,52 +109,7 @@ def compare_GT_NER_labels_md(file):
                 #     elif ent in GENERAL_TYPO.keys():
                 #         NER[i] = GENERAL_TYPO[ent]
 
-                # tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_single_turn_GT_NER_labels(GT, NER)
-                tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_NER_IN_GT(GT, NER)
-                TP += tmp_TP
-                samples_TP.extend(tmp_samples_TP)
-                FP += tmp_FP
-                samples_FP.extend(tmp_samples_FP)
-                FN += tmp_FN
-                samples_FN.extend(tmp_samples_FN)
-
-    print(f"TP: {TP} FN: {FN} FP: {FP}")
-    print("recall: {}".format(TP/(TP+FN)))
-    print("precision: {}".format(TP/(TP+FP)))
-    return TP, samples_TP, FP, samples_FP, FN, samples_FN
-
-
-def compare_GT_NER_labels_lg(file):
-    TP, FP, FN = 0, 0, 0
-    samples_TP, samples_FP, samples_FN = [], [], []
-    dialogues = json.load(open(file))
-    for dialogue_dict in tqdm(dialogues):
-        # for dialogue_dict in dialogues:
-        skip = False
-        # skip police and hospital domains
-        for domain in dialogue_dict['domains']:
-            if domain not in EXPERIMENT_DOMAINS:
-                skip = True
-
-        if not skip:
-            for turn in dialogue_dict['dialogue']:
-                GT = [v for ds, v in turn['turn_label']]
-                res = ner_lg(turn['transcript'])
-                NER = []
-                for word in res:
-                    if word.ent_iob_ == "B":
-                        NER.append(str(word))
-                    if word.ent_iob_ == "I":
-                        NER[-1] = f"{NER[-1]} {word}"
-
-                # for i, ent in enumerate(NER):
-                #     if ent[:5] == 'about':
-                #         NER[i] = ent[6:]
-                #     elif ent in GENERAL_TYPO.keys():
-                #         NER[i] = GENERAL_TYPO[ent]
-
-                # tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_single_turn_GT_NER_labels(GT, NER)
-                tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_NER_IN_GT(GT, NER)
+                tmp_TP, tmp_samples_TP, tmp_FP, tmp_samples_FP, tmp_FN, tmp_samples_FN = compare_NER_IN_GT(GT, VAL)
                 TP += tmp_TP
                 samples_TP.extend(tmp_samples_TP)
                 FP += tmp_FP
