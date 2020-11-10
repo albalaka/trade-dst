@@ -90,10 +90,16 @@ class BertForValueExtraction(torch.nn.Module):
         self.token_classifier.save_pretrained(model_path)
         print(f"Saving model at {model_path}")
 
-    def predict_sentence_values(self, tokenizer, sentence):
-        input_ids = tokenizer(sentence, return_tensors="pt")['input_ids'].to('cuda')
-        preds = self.predict(input_ids).cpu().numpy()[0]
-        input_ids = input_ids.cpu().numpy()[0]
+    def predict_sentence_values(self, tokenizer, sentence, device='cuda'):
+        if device == 'cuda':
+            input_ids = tokenizer(sentence, return_tensors="pt")['input_ids'].to('cuda')
+            preds = self.predict(input_ids).cpu().numpy()[0]
+            input_ids = input_ids.cpu().numpy()[0]
+
+        if device == 'cpu':
+            input_ids = tokenizer(sentence, return_tensors="pt")['input_ids']
+            preds = self.predict(input_ids).numpy()[0]
+            input_ids = input_ids.numpy()[0]
 
         values = []
         current_value_tokens = []
