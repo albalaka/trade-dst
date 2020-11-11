@@ -20,6 +20,7 @@ id2label = {0: "B",
 class BertForValueExtraction(torch.nn.Module):
     def __init__(self, num_labels=len(id2label.keys()), from_pretrained='bert-base-uncased'):
         super(BertForValueExtraction, self).__init__()
+        print(f"Loading BertForTokenClassification as {from_pretrained}")
         self.token_classifier = BertForTokenClassification.from_pretrained(from_pretrained,
                                                                            num_labels=num_labels,
                                                                            return_dict=True)
