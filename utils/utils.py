@@ -55,7 +55,7 @@ def parse_args():
     parser.add_argument('--no_categorical_evaluation', action='store_true')
     parser.add_argument('--only_categorical_evaluation', action='store_true')
     parser.add_argument('--appended_labels', type=str, default=None,
-                            choices=['NER','ground_truth','boosted_NER','BERT_VE'])
+                        choices=['NER', 'ground_truth', 'boosted_NER', 'BERT_VE'])
 
     args = parser.parse_args()
 

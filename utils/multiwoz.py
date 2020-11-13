@@ -173,6 +173,18 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
                 for value in values:
                     dialogue_history += f" {ENT_token} {value}"
 
+            # append labels to both system and user utterances
+            # if appended_labels == "BERT_VE":
+            #     sys_values = ve_model.predict_sentence_values(tokenizer, turn['system_transcript'])
+            #     usr_values = ve_model.predict_sentence_values(tokenizer, turn['transcript'])
+            #     dialogue_history = turn['system_transcript']
+            #     for value in sys_values:
+            #         dialogue_history += f" {ENT_token} {value}"
+
+            #     dialogue_history += f" ; {turn['transcript']}"
+            #     for value in usr_values:
+            #         dialogue_history += f" {ENT_token} {value}"
+
             dialogue_history += " ; "
             source_text = dialogue_history.strip()
             turn_belief_dict = fix_general_label_error(turn['belief_state'], slots, drop_slots)
