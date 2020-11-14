@@ -6,6 +6,8 @@ PAD_token = 1
 SOS_token = 2
 EOS_token = 3
 ENT_token = 4
+SYS_token = 5
+USR_token = 6
 
 MAX_GPU_SAMPLES = 4
 BINARY_SLOTS = ['hotel-parking', 'hotel-internet']
@@ -54,8 +56,10 @@ def parse_args():
     parser.add_argument('--only_binary_evaluation', action='store_true')
     parser.add_argument('--no_categorical_evaluation', action='store_true')
     parser.add_argument('--only_categorical_evaluation', action='store_true')
-    parser.add_argument('--appended_labels', type=str, default=None,
-                        choices=['NER', 'ground_truth', 'boosted_NER', 'BERT_VE'])
+    parser.add_argument('--appended_values', type=str, default=None,
+                        choices=['NER', 'ground_truth', 'boosted_NER', 'BERT_VE', 'DB'])
+    parser.add_argument('--USR_SYS_tokens', action='store_true')
+    parser.add_argument('--append_SYS_values', action='store_true')
 
     args = parser.parse_args()
 
@@ -65,6 +69,8 @@ def parse_args():
     setattr(args, 'SOS_token', SOS_token)
     setattr(args, 'EOS_token', EOS_token)
     setattr(args, 'ENT_token', ENT_token)
+    setattr(args, 'SYS_token', SYS_token)
+    setattr(args, 'USR_token', USR_token)
     setattr(args, 'unk_mask', True)
     setattr(args, 'early_stopping', None)
 
@@ -91,5 +97,9 @@ def parse_args():
         for slot in CATEGORICAL_SLOTS:
             args.eval_slots.remove(slot)
     # print(f"Evaluating on {args.eval_slots}")
+
+    assert(not(getattr(args, "appended_values") == "ground_truth" and getattr(args, "append_SYS_values"))),\
+        "Ground truth values are not determined by the speaker, appending these values to the system utterance\
+                will result in doubly appending values to the system utterance and user utterance"
 
     return vars(args)
