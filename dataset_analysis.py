@@ -147,7 +147,7 @@ def compare_GT_NER_labels(file, include_sys=False):
                 if include_sys:
                     sys_res = ner(turn['system_transcript'])
                     results.append(sys_res)
-                    
+
                 NER = []
                 for res in results:
                     for word in res:
