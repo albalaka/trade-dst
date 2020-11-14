@@ -99,6 +99,32 @@ def get_testing_slot_scores(experiment_ID):
     return get_single_slot_scores(test_data)
 
 
+def get_testing_unique_FN_single_slot(experiment_ID, slot, top_k=10):
+    count = 0
+    test_data = get_testing_data(experiment_ID)
+    res = {}
+    for ds in test_data['FN_slots']:
+        if count > top_k:
+            break
+        if ds.rsplit("-", 1)[0] == slot:
+            res[ds] = test_data['FN_slots'][ds]
+            count += 1
+    return res
+
+
+def get_testing_unique_FP_single_slot(experiment_ID, slot, top_k=10):
+    count = 0
+    test_data = get_testing_data(experiment_ID)
+    res = {}
+    for ds in test_data['FP_slots']:
+        if count > top_k:
+            break
+        if ds.rsplit("-", 1)[0] == slot:
+            res[ds] = test_data['FP_slots'][ds]
+            count += 1
+    return res
+
+
 def get_all_evaluation_slot_scores(experiment_ID):
     """
     Reorganizes slot scores, instead of a single dict entry representing the results of an epoch (TP,FP,FN),
