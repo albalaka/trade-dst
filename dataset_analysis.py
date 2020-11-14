@@ -85,7 +85,7 @@ def fix_general_label_error(labels, slots, drop_slots):
     return label_dict
 
 
-def load_multiwoz_database(database_file="edited_ontology.json"):
+def load_multiwoz_database(database_file="data/multi-woz/MULTIWOZ2 2/ontology.json"):  # "edited_ontology.json"
     # Returns all possible values from the database, as a dict
     ontology = json.load(open(database_file))
     return ontology
