@@ -10,6 +10,7 @@ from BertForValueExtraction import BertForValueExtraction
 from transformers import BertTokenizer
 from tqdm import tqdm
 
+from dataset_analysis import find_database_value_in_utterance, load_multiwoz_database
 
 import en_core_web_sm
 ner = en_core_web_sm.load()
@@ -37,11 +38,12 @@ class Lang():
         token index -> english
     """
 
-    def __init__(self, PAD_token, SOS_token, EOS_token, UNK_token, ENT_token):
+    def __init__(self, PAD_token, SOS_token, EOS_token, UNK_token, ENT_token, SYS_token, USR_token):
         self.word2index = {}
         self.index2word = {PAD_token: "PAD", SOS_token: "SOS",
                            EOS_token: "EOS", UNK_token: "UNK",
-                           ENT_token: "ENT"}
+                           ENT_token: "ENT", SYS_token: "SYS",
+                           USR_token: "USR"}
         self.n_words = len(self.index2word)  # Count default tokens
         self.word2index = dict([(v, k) for k, v in self.index2word.items()])
 
@@ -72,8 +74,97 @@ class Lang():
             self.n_words += 1
 
 
+def append_GT_values(turn, turn_label, ENT_token, percent_ground_truth):
+    for domain_slot, value in turn_label:
+        if random.random() <= percent_ground_truth*0.01:
+            turn += f" {ENT_token} {value}"
+    return turn
+
+
+def append_NER_values(turn, ENT_token):
+    res = ner(turn)
+    for word in res:
+        if word.ent_iob_ == "B":
+            turn += f" {ENT_token} {word}"
+        if word.ent_iob == "I":
+            turn += f" {word}"
+    return turn
+
+
+def append_boosted_NER_values(turn, turn_label, ENT_token):
+    res = ner(turn)
+    for word in res:
+        if word.ent_iob_ == "B":
+            turn += f" {ENT_token} {word}"
+        if word.ent_iob == "I":
+            turn += f" {word}"
+    for domain_slot, value in turn_label:
+        if domain_slot in ['hotel-parking', 'hotel-internet']:
+            turn += f" {ENT_token} {value}"
+    return turn
+
+
+def append_BERT_VE_values(turn, ve_model, tokenizer, ENT_token):
+    values = ve_model.predict_sentence_values(tokenizer, turn)
+    for value in values:
+        turn += f" {ENT_token} {value}"
+    return turn
+
+
+def append_DB_values(turn, database, ENT_token):
+    domain_slot_values = find_database_value_in_utterance(turn, database)
+    for ds, value in domain_slot_values.items():
+        for v in value:
+            turn += f" {ENT_token} {ds} {v}"
+    return turn
+
+
+def get_turn(turn, value_source, ENT_token, **kwargs):
+    """
+    Appends values from value_source to a single turn
+    kwargs should be specific to the value source
+    :param turn: string that is either the system utterance, user utterance, or both
+    :param value_source: name of source that generates values
+    :param ENT_token: special token appended before the generated 
+    :returns: string of turn, with values appended
+    """
+
+    # If this is a system turn and we don't want to add values from the sytem
+    if not kwargs['append_SYS_values'] and kwargs['speaker'] == 'system':
+        return turn
+
+    # If either:
+    #       this is a system turn and we want to append system values
+    #       this is a user turn
+    if value_source == 'ground_truth':
+        current_turn_dialogue = append_GT_values(turn, kwargs['turn_label'], ENT_token,
+                                                 kwargs['percent_ground_truth'])
+
+    elif value_source == "NER":
+        current_turn_dialogue = append_NER_values(turn, ENT_token)
+
+    elif value_source == "boosted_NER":
+        current_turn_dialogue = append_boosted_NER_values(turn, kwargs['turn_label'],
+                                                          ENT_token)
+
+    elif value_source == "BERT_VE":
+        current_turn_dialogue = append_BERT_VE_values(turn, kwargs['ve_model'],
+                                                      kwargs['tokenizer'], ENT_token)
+
+    elif value_source == "DB":
+        current_turn_dialogue = append_DB_values(turn, kwargs['database'], ENT_token)
+
+    else:
+        current_turn_dialogue = turn
+
+    return current_turn_dialogue
+
+
 def read_language(dataset_path, gating_dict, slots, dataset, language, mem_language,
-                  ENT_token=None, appended_labels=None, percent_ground_truth=100, only_domain='',
+                  SYS_token=None, use_USR_SYS_tokens=False,
+                  USR_token=None, ENT_token=None, appended_values=None,
+                  append_SYS_values=False,
+                  percent_ground_truth=100, only_domain='',
                   except_domain='', data_ratio=100, drop_slots=None):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to a json dataset (rg. data/train_dials.json)
@@ -94,13 +185,24 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
     # Load all dialogues in the dataset
     dialogues = json.load(open(dataset_path))
 
+    value_kwargs = {'turn_label': None,
+                    'percent_ground_truth': percent_ground_truth,
+                    'append_SYS_values': append_SYS_values}
+
     # If we need the BERT_VE model, load it, and the tokenizer
-    if appended_labels == 'BERT_VE':
+    if appended_values == 'BERT_VE':
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        ve_model = BertForValueExtraction(from_pretrained='BERT_ValueExtraction_models/8590_bs60_gradacc40_lr1e-5_fp16-ACC0.9785')
+        ve_model = BertForValueExtraction(from_pretrained='BERT_ValueExtraction_models/8590_sysusr_bs60_gradacc40_lr1e-6_fp16-ACC0.9339')
         if cuda.is_available():
             ve_model.to('cuda')
             ve_model.eval()
+        value_kwargs['tokenizer'] = tokenizer
+        value_kwargs['ve_model'] = ve_model
+
+    # If we need the ontology, load it
+    if appended_values == 'DB':
+        database = load_multiwoz_database()
+        value_kwargs['database'] = database
 
     # create the vocab for this dataset
     for dialogue_dict in dialogues:
@@ -135,57 +237,28 @@ def read_language(dataset_path, gating_dict, slots, dataset, language, mem_langu
         for turn in dialogue_dict['dialogue']:
             turn_domain = turn['domain']
             turn_idx = turn['turn_idx']
-            # turn_utterance = turn['system_transcript']+" ; "+turn['transcript']
-            # turn_utterance_stripped = turn_utterance.strip()
-            dialogue_history += (turn['system_transcript'] +
-                                 " ; "+turn['transcript'])
+            current_turn_dialogue = ""
 
-            # ADD grount truth labels from this turn
-            if appended_labels == 'ground_truth':
-                for domain_slot, value in turn['turn_label']:
-                    if random.random() <= percent_ground_truth*0.01:
-                        dialogue_history += f" {ENT_token} {value}"
+            value_kwargs['turn_label'] = turn['turn_label']
+            value_kwargs['speaker'] = 'system'
 
-            # IF using NER, add NER labels here
-            if appended_labels == "NER":
-                # append entities from the user utterance
-                res = ner(turn['transcript'])
-                for word in res:
-                    if word.ent_iob_ == "B":
-                        dialogue_history += f" {ENT_token} {word}"
-                    if word.ent_iob == "I":
-                        dialogue_history += f" {word}"
+            if use_USR_SYS_tokens:
+                current_turn_dialogue += f" {SYS_token}"
 
-            # Use NER labels + GT labels for binary slots
-            if appended_labels == "boosted_NER":
-                res = ner(turn['transcript'])
-                for word in res:
-                    if word.ent_iob_ == "B":
-                        dialogue_history += f" {ENT_token} {word}"
-                    if word.ent_iob == "I":
-                        dialogue_history += f" {word}"
-                for domain_slot, value in turn['turn_label']:
-                    if domain_slot in ['hotel-parking', 'hotel-internet']:
-                        dialogue_history += f" {ENT_token} {value}"
+            current_turn_dialogue += f" {get_turn(turn['system_transcript'], appended_values, ENT_token, **value_kwargs)}"
 
-            if appended_labels == "BERT_VE":
-                values = ve_model.predict_sentence_values(tokenizer, turn['transcript'])
-                for value in values:
-                    dialogue_history += f" {ENT_token} {value}"
+            value_kwargs['speaker'] = 'user'
+            if use_USR_SYS_tokens:
+                current_turn_dialogue += f" {USR_token} "
+            else:
+                current_turn_dialogue += " ; "
 
-            # append labels to both system and user utterances
-            # if appended_labels == "BERT_VE":
-            #     sys_values = ve_model.predict_sentence_values(tokenizer, turn['system_transcript'])
-            #     usr_values = ve_model.predict_sentence_values(tokenizer, turn['transcript'])
-            #     dialogue_history = turn['system_transcript']
-            #     for value in sys_values:
-            #         dialogue_history += f" {ENT_token} {value}"
+            current_turn_dialogue += get_turn(turn['transcript'], appended_values, ENT_token, **value_kwargs)
 
-            #     dialogue_history += f" ; {turn['transcript']}"
-            #     for value in usr_values:
-            #         dialogue_history += f" {ENT_token} {value}"
+            if not use_USR_SYS_tokens:
+                current_turn_dialogue += " ;"
 
-            dialogue_history += " ; "
+            dialogue_history += current_turn_dialogue
             source_text = dialogue_history.strip()
             turn_belief_dict = fix_general_label_error(turn['belief_state'], slots, drop_slots)
 
@@ -335,14 +408,18 @@ def prepare_data(training, **kwargs):
         SOS_token=kwargs['SOS_token'],
         EOS_token=kwargs['EOS_token'],
         UNK_token=kwargs['UNK_token'],
-        ENT_token=kwargs['ENT_token']
+        ENT_token=kwargs['ENT_token'],
+        SYS_token=kwargs['SYS_token'],
+        USR_token=kwargs['USR_token']
     )
     mem_lang = Lang(
         PAD_token=kwargs['PAD_token'],
         SOS_token=kwargs['SOS_token'],
         EOS_token=kwargs['EOS_token'],
         UNK_token=kwargs['UNK_token'],
-        ENT_token=kwargs['ENT_token']
+        ENT_token=kwargs['ENT_token'],
+        SYS_token=kwargs['SYS_token'],
+        USR_token=kwargs['USR_token']
     )
     lang.index_words(all_slots, 'slot')
     mem_lang.index_words(all_slots, 'slot')
@@ -353,7 +430,11 @@ def prepare_data(training, **kwargs):
         # Get training data, longest training turn length, slots used in training
         data_train, max_len_train, slot_train = read_language(file_train, gating_dict, all_slots, "train", lang, mem_lang,
                                                               ENT_token=lang.index2word[kwargs['ENT_token']],
-                                                              appended_labels=kwargs['appended_labels'],
+                                                              use_USR_SYS_tokens=kwargs['USR_SYS_tokens'],
+                                                              SYS_token=lang.index2word[kwargs['SYS_token']],
+                                                              USR_token=lang.index2word[kwargs['USR_token']],
+                                                              appended_values=kwargs['appended_values'],
+                                                              append_SYS_values=kwargs['append_SYS_values'],
                                                               percent_ground_truth=kwargs['percent_ground_truth'],
                                                               data_ratio=kwargs['train_data_ratio'],
                                                               drop_slots=kwargs['drop_slots'])
@@ -363,7 +444,11 @@ def prepare_data(training, **kwargs):
         # Get dev data, longest dev turn length, slots used in dev
         data_dev, max_len_dev, slot_dev = read_language(file_dev, gating_dict, all_slots, "dev", lang, mem_lang,
                                                         ENT_token=lang.index2word[kwargs['ENT_token']],
-                                                        appended_labels=kwargs['appended_labels'],
+                                                        use_USR_SYS_tokens=kwargs['USR_SYS_tokens'],
+                                                        SYS_token=lang.index2word[kwargs['SYS_token']],
+                                                        USR_token=lang.index2word[kwargs['USR_token']],
+                                                        appended_values=kwargs['appended_values'],
+                                                        append_SYS_values=kwargs['append_SYS_values'],
                                                         percent_ground_truth=kwargs['percent_ground_truth'],
                                                         data_ratio=kwargs['dev_data_ratio'],
                                                         drop_slots=kwargs['drop_slots'])
@@ -411,7 +496,11 @@ def prepare_data(training, **kwargs):
         data_test, max_len_test, slot_test = read_language(file_test, gating_dict, all_slots, "test",
                                                            lang, mem_lang,
                                                            ENT_token=lang.index2word[kwargs['ENT_token']],
-                                                           appended_labels=kwargs['appended_labels'],
+                                                           use_USR_SYS_tokens=kwargs['USR_SYS_tokens'],
+                                                           SYS_token=lang.index2word[kwargs['SYS_token']],
+                                                           USR_token=lang.index2word[kwargs['USR_token']],
+                                                           appended_values=kwargs['appended_values'],
+                                                           append_SYS_values=kwargs['append_SYS_values'],
                                                            percent_ground_truth=kwargs['percent_ground_truth'],
                                                            data_ratio=kwargs['test_data_ratio'],
                                                            drop_slots=kwargs['drop_slots'])
