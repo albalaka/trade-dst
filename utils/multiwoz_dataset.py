@@ -14,7 +14,7 @@ class Dataset(torch.utils.data.Dataset):
         """Reads source and target sequences from txt files."""
         self.ID = data_info['ID']
         # list of domains by TURN, not by dialogue
-        self.turn_domain = data_info['turn_domain']
+        # self.turn_domain = data_info['turn_domain']
         # list of turn indices per dialogue [0,1,2,3,4, 0,1,2,3, etc]
         self.turn_id = data_info['turn_id']
         # dialogue history by turn
@@ -41,7 +41,7 @@ class Dataset(torch.utils.data.Dataset):
         turn_belief = self.turn_belief[index]
         gating_label = self.gating_label[index]
         # turn_uttr = self.turn_uttr[index]
-        turn_domain = self.preprocess_domain(self.turn_domain[index])
+        # turn_domain = self.preprocess_domain(self.turn_domain[index])
         generate_y = self.generate_y[index]
         generate_y = self.preprocess_slot(generate_y, self.trg_word2id)
         context = self.dialog_history[index]
@@ -56,7 +56,7 @@ class Dataset(torch.utils.data.Dataset):
             "context": context,
             "context_plain": context_plain,
             # "turn_uttr_plain": turn_uttr,
-            "turn_domain": turn_domain,
+            # "turn_domain": turn_domain,
             "generate_y": generate_y,
         }
         return item_info
@@ -127,12 +127,12 @@ def collate_fn(data):
     src_seqs, src_lengths = merge(item_info['context'])
     y_seqs, y_lengths = merge_multi_response(item_info["generate_y"])
     gating_label = torch.tensor(item_info["gating_label"])
-    turn_domain = torch.tensor(item_info["turn_domain"])
+    # turn_domain = torch.tensor(item_info["turn_domain"])
 
     item_info["context"] = src_seqs.to(DEVICE)
     item_info["context_len"] = src_lengths
     item_info["gating_label"] = gating_label.to(DEVICE)
-    item_info["turn_domain"] = turn_domain.to(DEVICE)
+    # item_info["turn_domain"] = turn_domain.to(DEVICE)
     item_info["generate_y"] = y_seqs.to(DEVICE)
     item_info["y_lengths"] = y_lengths.to(DEVICE)
     return item_info
