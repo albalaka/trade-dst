@@ -5,7 +5,7 @@ from torch.nn.utils import clip_grad_norm_
 from torch.optim import Adam, lr_scheduler
 
 from models.TRADE import TRADE
-from utils.multiwoz import prepare_data
+from utils.multiwoz import prepare_data, prepare_data_multiwoz_22
 from utils.logger import simple_logger
 import utils.utils
 
@@ -14,7 +14,11 @@ def main(**kwargs):
     logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
     avg_best, count, accuracy = 0.0, 0, 0.0
-    train, dev, _, lang, slot_list, gating_dict, vocab_size_train = prepare_data(training=True, **kwargs)
+    if kwargs['dataset'] == 'multiwoz':
+        train, dev, _, lang, slot_list, gating_dict, vocab_size_train = prepare_data(training=True, **kwargs)
+
+    if kwargs['dataset'] == 'multiwoz_22':
+        train, dev, _, lang, slot_list, gating_dict, vocab_size_train = prepare_data_multiwoz_22(training=True, **kwargs)
 
     model = TRADE(lang, slot_list, gating_dict, **kwargs)
     model.train()
@@ -94,5 +98,4 @@ def main(**kwargs):
 
 
 if __name__ == "__main__":
-
     main(**utils.utils.parse_args())
