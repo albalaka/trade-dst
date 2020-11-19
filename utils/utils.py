@@ -97,6 +97,8 @@ def parse_args():
         for slot in CATEGORICAL_SLOTS:
             args.eval_slots.remove(slot)
     # print(f"Evaluating on {args.eval_slots}")
+    if args.dataset == 'multiwoz_22':
+        assert(args.lang_path == 'lang_data_multiwoz_22')
 
     assert(not(getattr(args, "appended_values") == "ground_truth" and getattr(args, "append_SYS_values"))),\
         "Ground truth values are not determined by the speaker, appending these values to the system utterance\
