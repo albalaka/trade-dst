@@ -2,7 +2,7 @@ import argparse
 from torch import cuda
 
 from models.TRADE import TRADE
-from utils.multiwoz import prepare_data
+from utils.multiwoz import prepare_data, prepare_data_multiwoz_22
 from utils.logger import simple_logger
 import utils.utils
 
@@ -10,7 +10,10 @@ import utils.utils
 def main(**kwargs):
     logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
-    _, _, test, lang, slot_list, gating_dict, _ = prepare_data(training=False, **kwargs)
+    if kwargs['dataset'] == 'multiwoz':
+        _, _, test, lang, slot_list, gating_dict, _ = prepare_data(training=False, **kwargs)
+    if kwargs['dataset'] == 'multiwoz_22':
+        _, _, test, lang, slot_list, gating_dict, _ = prepare_data_multiwoz_22(training=False, **kwargs)
 
     model = TRADE(lang, slot_list, gating_dict, **kwargs)
     model.eval()
