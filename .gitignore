@@ -3,8 +3,11 @@ venv/
 save/
 sftp-config.json
 data/
+MultiWOZ_2.2/
 *.pyc
 lang_data/
+original_lang_data/
+lang_data_multiwoz_22/
 models/__pycache__
 utils/__pycache__
 logs/
