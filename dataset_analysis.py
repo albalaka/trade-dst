@@ -351,10 +351,94 @@ def get_slot_values(file):
     return slots, total_turns, empty_turns
 
 
-def view_multiwoz_metadata():
-    train_slots, train_total_turns, train_empty_turns = get_slot_values(file_train)
-    dev_slots, dev_total_turns, dev_empty_turns = get_slot_values(file_dev)
-    test_slots, test_total_turns, test_empty_turns = get_slot_values(file_test)
+def get_slot_values_MW_22_single_file(file):
+    slots = {}
+    total_turns = 0
+    empty_turns = 0
+
+    dialogs = json.load(open(file))
+    for dialog in dialogs:
+        skip = False
+        for domain in dialog['services']:
+            if domain not in EXPERIMENT_DOMAINS:
+                skip = True
+
+        if not skip:
+            for turn in dialog['turns']:
+                if turn['speaker'] == 'USER':
+                    empty_turn = True
+                    for frame in turn['frames']:
+                        for ds, v in frame['state']['slot_values'].items():
+                            values = str(sorted(v))
+                            if ds not in slots.keys():
+                                slots[ds] = {values: 1}
+                            elif values not in slots[ds]:
+                                slots[ds][values] = 1
+                            else:
+                                slots[ds][values] += 1
+                            empty_turn = False
+                    total_turns += 1
+                    if empty_turn:
+                        empty_turns += 1
+    for ds in slots:
+        slots[ds] = {k: v for k, v in sorted(slots[ds].items(), key=lambda item: item[1], reverse=True)}
+    return slots, total_turns, empty_turns
+
+
+def get_slot_values_MW_22(dataset_split="test"):
+    assert(dataset_split in ['train', 'dev', 'test', 'all'])
+
+    train_files = ["MultiWOZ_2.2/train/dialogues_001.json", "MultiWOZ_2.2/train/dialogues_002.json",
+                   "MultiWOZ_2.2/train/dialogues_003.json", "MultiWOZ_2.2/train/dialogues_004.json",
+                   "MultiWOZ_2.2/train/dialogues_005.json", "MultiWOZ_2.2/train/dialogues_006.json",
+                   "MultiWOZ_2.2/train/dialogues_007.json", "MultiWOZ_2.2/train/dialogues_008.json",
+                   "MultiWOZ_2.2/train/dialogues_009.json", "MultiWOZ_2.2/train/dialogues_010.json",
+                   "MultiWOZ_2.2/train/dialogues_011.json", "MultiWOZ_2.2/train/dialogues_012.json",
+                   "MultiWOZ_2.2/train/dialogues_013.json", "MultiWOZ_2.2/train/dialogues_014.json",
+                   "MultiWOZ_2.2/train/dialogues_015.json", "MultiWOZ_2.2/train/dialogues_016.json",
+                   "MultiWOZ_2.2/train/dialogues_017.json"]
+    dev_files = ["MultiWOZ_2.2/dev/dialogues_001.json", "MultiWOZ_2.2/dev/dialogues_002.json"]
+    test_files = ["MultiWOZ_2.2/test/dialogues_001.json", "MultiWOZ_2.2/test/dialogues_002.json"]
+
+    if dataset_split == "train":
+        all_slots = [get_slot_values_MW_22_single_file(file) for file in train_files]
+    elif dataset_split == "dev":
+        all_slots = [get_slot_values_MW_22_single_file(file) for file in dev_files]
+    elif dataset_split == "test":
+        all_slots = [get_slot_values_MW_22_single_file(file) for file in test_files]
+    else:
+        all_slots = [get_slot_values_MW_22_single_file(file) for file in train_files+dev_files+test_files]
+
+    total_turns = sum([s[1] for s in all_slots])
+    empty_turns = sum([s[2] for s in all_slots])
+
+    domain_slots = []
+    for s, tt, et in all_slots:
+        domain_slots.extend(s)
+    domain_slots = set(domain_slots)
+
+    slots = {ds: {} for ds in domain_slots}
+
+    for s, tt, et in all_slots:
+        for ds in s.keys():
+            for v in s[ds].keys():
+                if v not in slots[ds].keys():
+                    slots[ds][v] = 0
+                slots[ds][v] += s[ds][v]
+
+    return slots, total_turns, empty_turns
+
+
+def view_multiwoz_metadata(MW_version="original"):
+    if MW_version == 'original':
+        train_slots, train_total_turns, train_empty_turns = get_slot_values(file_train)
+        dev_slots, dev_total_turns, dev_empty_turns = get_slot_values(file_dev)
+        test_slots, test_total_turns, test_empty_turns = get_slot_values(file_test)
+
+    elif MW_version == '22':
+        train_slots, train_total_turns, train_empty_turns = get_slot_values_MW_22("train")
+        dev_slots, dev_total_turns, dev_empty_turns = get_slot_values_MW_22("dev")
+        test_slots, test_total_turns, test_empty_turns = get_slot_values_MW_22("test")
 
     combined_slots = {}
     total_slot_values = 0
@@ -375,31 +459,15 @@ def view_multiwoz_metadata():
     print(f"Total turns \t\t\t{train_total_turns} {dev_total_turns} {test_total_turns}")
     print(f"Empty turns \t\t\t{train_empty_turns} {dev_empty_turns} {test_empty_turns}")
     print("\nSamples per slot type:".ljust(30), "# train/dev/test".ljust(20), "# unique values".ljust(20), "Percent of total slots")
-    for slot in train_slots:
+    for slot in sorted(train_slots):
         tot_single_slot = sum(train_slots[slot].values())+sum(dev_slots[slot].values())+sum(test_slots[slot].values())
         print(
             f"{slot: <30}\t{sum(train_slots[slot].values())}/{sum(dev_slots[slot].values())}/{sum(test_slots[slot].values()): <15}{len(combined_slots[slot]): <15}{tot_single_slot/total_slot_values: .3f}")
 
     print("\nDETAILS")
     print("Most frequent values per slot".ljust(30), "VALUE".ljust(10), "COUNT".ljust(10), "PERCENT".ljust(10), "PERCENT ALL TURNS")
-    for slot in train_slots:
+    for slot in sorted(train_slots):
         print(f"\n{slot}")
         for k in list(combined_slots[slot].keys())[:10]:
             print(
                 f"{k: >35} {combined_slots[slot][k]: >10} {combined_slots[slot][k]/sum(combined_slots[slot].values()):>10.2f} {combined_slots[slot][k]/(train_total_turns+dev_total_turns+test_total_turns):>10.2f}")
-
-# def GT_in_turn(file):
-#     dialogues = json.load(open(file))
-#     for dialogue_dict in tqdm(dialogues):
-#         # for dialogue_dict in dialogues:
-#         skip = False
-#         # skip police and hospital domains
-#         for domain in dialogue_dict['domains']:
-#             if domain not in EXPERIMENT_DOMAINS:
-#                 skip = True
-
-#         if not skip:
-
-
-# TP, samples_TP, FP, samples_FP, FN, samples_FN = compare_GT_NER_labels_separate_slots(file_dev)
-# view_multiwoz_metadata()
