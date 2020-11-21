@@ -1,4 +1,6 @@
 import argparse
+import re
+import json
 from torch import cuda
 
 UNK_token = 0
@@ -105,3 +107,89 @@ def parse_args():
                 will result in doubly appending values to the system utterance and user utterance"
 
     return vars(args)
+
+
+# def find_database_value_in_utterance(utterance, database):
+#     found_values = {}
+#     for domain_slot, values in database.items():
+#         # for val in values:
+#         #     if val in utterance:
+#         #         if domain_slot not in found_values.keys():
+#         #             found_values[domain_slot] = []
+#         #         found_values[domain_slot].append(val)
+
+#         matches = re.findall(r"(?=("+'|'.join(values)+r"))", utterance)
+#         if matches:
+#             found_values[domain_slot] = matches
+#     return found_values
+
+def find_database_value_in_utterance(utterance, database):
+    found_values = {}
+    for domain_slot, values in database.items():
+
+        matches = re.findall(r"(?=("+'|'.join(values)+r"))", utterance, re.IGNORECASE)
+        if matches:
+            found_values[domain_slot] = [m.strip() for m in matches]
+    return found_values
+
+def load_multiwoz_database(database_file="data/multi-woz/MULTIWOZ2 2/ontology.json"):  # "edited_ontology.json"
+    # Returns all possible values from the database, as a dict
+    ontology = json.load(open(database_file))
+    return ontology
+
+
+def load_multiwoz_22_database():
+    # Returns all possible values from the database, as a dataset
+
+
+    files_train = ["MultiWOZ_2.2/train/dialogues_001.json", "MultiWOZ_2.2/train/dialogues_002.json",
+                "MultiWOZ_2.2/train/dialogues_003.json", "MultiWOZ_2.2/train/dialogues_004.json",
+                "MultiWOZ_2.2/train/dialogues_005.json", "MultiWOZ_2.2/train/dialogues_006.json",
+                "MultiWOZ_2.2/train/dialogues_007.json", "MultiWOZ_2.2/train/dialogues_008.json",
+                "MultiWOZ_2.2/train/dialogues_009.json", "MultiWOZ_2.2/train/dialogues_010.json",
+                "MultiWOZ_2.2/train/dialogues_011.json", "MultiWOZ_2.2/train/dialogues_012.json",
+                "MultiWOZ_2.2/train/dialogues_013.json", "MultiWOZ_2.2/train/dialogues_014.json",
+                "MultiWOZ_2.2/train/dialogues_015.json", "MultiWOZ_2.2/train/dialogues_016.json",
+                "MultiWOZ_2.2/train/dialogues_017.json"]
+    files_dev = ["MultiWOZ_2.2/dev/dialogues_001.json",
+                "MultiWOZ_2.2/dev/dialogues_002.json"]
+    files_test = ["MultiWOZ_2.2/test/dialogues_001.json",
+                "MultiWOZ_2.2/test/dialogues_002.json"]
+
+    noncat_slot_names = ["restaurant-food", "restaurant-name", "restaurant-booktime",
+                        "attraction-name", "hotel-name", "taxi-destination",
+                        "taxi-departure", "taxi-arriveby", "taxi-leaveat",
+                        "train-arriveby", "train-leaveat"]
+    cat_slot_names = ["restaurant-pricerange", "restaurant-area", "restaurant-bookday", "restaurant-bookpeople",
+                    "attraction-area", "attraction-type", "hotel-pricerange", "hotel-parking",
+                    "hotel-internet", "hotel-stars", "hotel-area", "hotel-type", "hotel-bookpeople",
+                    "hotel-bookday", "hotel-bookstay", "train-destination", "train-departure",
+                    "train-day", "train-bookpeople"]
+
+    ontology = {k: set() for k in noncat_slot_names+cat_slot_names}
+
+    for f in files_train+files_dev+files_test:
+        dialogues = json.load(open(f))
+        for dialogue_dict in dialogues:
+            for turn in dialogue_dict['turns']:
+                for frame in turn['frames']:
+                    for slot in frame['slots']:
+                        # check to make sure this domain-slot is in the domains that we care about
+                        if slot['slot'] not in noncat_slot_names+cat_slot_names:
+                            continue
+
+                        if type(slot['value']) == list:
+                            for v in slot['value']:
+                                ontology[slot['slot']].add(f" {v} ")
+                        else:
+                            ontology[slot['slot']].add(f" {slot['value']} ")
+
+                    # belief state only comes attached with user turns
+                    if turn['speaker'] == "USER":
+                        for ds, values in frame['state']['slot_values'].items():
+                            # check to make sure this domain-slot is in the domains that we care about
+                            if ds not in noncat_slot_names+cat_slot_names:
+                                continue
+                            for v in values:
+                                ontology[ds].add(f" {v} ")
+    return ontology
