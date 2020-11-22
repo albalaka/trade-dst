@@ -100,7 +100,7 @@ def parse_args():
             args.eval_slots.remove(slot)
     # print(f"Evaluating on {args.eval_slots}")
     if args.dataset == 'multiwoz_22':
-        assert(args.lang_path == 'lang_data_multiwoz_22')
+        setattr(args, "lang_path", "lang_data_multiwoz_22")
 
     assert(not(getattr(args, "appended_values") == "ground_truth" and getattr(args, "append_SYS_values"))),\
         "Ground truth values are not determined by the speaker, appending these values to the system utterance\
@@ -126,11 +126,20 @@ def parse_args():
 def find_database_value_in_utterance(utterance, database):
     found_values = {}
     for domain_slot, values in database.items():
-
-        matches = re.findall(r"(?=("+'|'.join(values)+r"))", utterance, re.IGNORECASE)
+        # matches = re.findall(r"(?=("+'|'.join(values)+r")){e<=1}",
+        #                      utterance, re.IGNORECASE)
+        # matches = re.findall(r"(?=("+'|'.join(values)+r"))",
+        #                      utterance, re.IGNORECASE)
+        matches = []
+        uttr_lower = utterance.lower()
+        for v in values:
+            if v.lower() in uttr_lower:
+                matches.append(v)
         if matches:
             found_values[domain_slot] = [m.strip() for m in matches]
+
     return found_values
+
 
 def load_multiwoz_database(database_file="data/multi-woz/MULTIWOZ2 2/ontology.json"):  # "edited_ontology.json"
     # Returns all possible values from the database, as a dict
@@ -141,30 +150,29 @@ def load_multiwoz_database(database_file="data/multi-woz/MULTIWOZ2 2/ontology.js
 def load_multiwoz_22_database():
     # Returns all possible values from the database, as a dataset
 
-
     files_train = ["MultiWOZ_2.2/train/dialogues_001.json", "MultiWOZ_2.2/train/dialogues_002.json",
-                "MultiWOZ_2.2/train/dialogues_003.json", "MultiWOZ_2.2/train/dialogues_004.json",
-                "MultiWOZ_2.2/train/dialogues_005.json", "MultiWOZ_2.2/train/dialogues_006.json",
-                "MultiWOZ_2.2/train/dialogues_007.json", "MultiWOZ_2.2/train/dialogues_008.json",
-                "MultiWOZ_2.2/train/dialogues_009.json", "MultiWOZ_2.2/train/dialogues_010.json",
-                "MultiWOZ_2.2/train/dialogues_011.json", "MultiWOZ_2.2/train/dialogues_012.json",
-                "MultiWOZ_2.2/train/dialogues_013.json", "MultiWOZ_2.2/train/dialogues_014.json",
-                "MultiWOZ_2.2/train/dialogues_015.json", "MultiWOZ_2.2/train/dialogues_016.json",
-                "MultiWOZ_2.2/train/dialogues_017.json"]
+                   "MultiWOZ_2.2/train/dialogues_003.json", "MultiWOZ_2.2/train/dialogues_004.json",
+                   "MultiWOZ_2.2/train/dialogues_005.json", "MultiWOZ_2.2/train/dialogues_006.json",
+                   "MultiWOZ_2.2/train/dialogues_007.json", "MultiWOZ_2.2/train/dialogues_008.json",
+                   "MultiWOZ_2.2/train/dialogues_009.json", "MultiWOZ_2.2/train/dialogues_010.json",
+                   "MultiWOZ_2.2/train/dialogues_011.json", "MultiWOZ_2.2/train/dialogues_012.json",
+                   "MultiWOZ_2.2/train/dialogues_013.json", "MultiWOZ_2.2/train/dialogues_014.json",
+                   "MultiWOZ_2.2/train/dialogues_015.json", "MultiWOZ_2.2/train/dialogues_016.json",
+                   "MultiWOZ_2.2/train/dialogues_017.json"]
     files_dev = ["MultiWOZ_2.2/dev/dialogues_001.json",
-                "MultiWOZ_2.2/dev/dialogues_002.json"]
+                 "MultiWOZ_2.2/dev/dialogues_002.json"]
     files_test = ["MultiWOZ_2.2/test/dialogues_001.json",
-                "MultiWOZ_2.2/test/dialogues_002.json"]
+                  "MultiWOZ_2.2/test/dialogues_002.json"]
 
     noncat_slot_names = ["restaurant-food", "restaurant-name", "restaurant-booktime",
-                        "attraction-name", "hotel-name", "taxi-destination",
-                        "taxi-departure", "taxi-arriveby", "taxi-leaveat",
-                        "train-arriveby", "train-leaveat"]
+                         "attraction-name", "hotel-name", "taxi-destination",
+                         "taxi-departure", "taxi-arriveby", "taxi-leaveat",
+                         "train-arriveby", "train-leaveat"]
     cat_slot_names = ["restaurant-pricerange", "restaurant-area", "restaurant-bookday", "restaurant-bookpeople",
-                    "attraction-area", "attraction-type", "hotel-pricerange", "hotel-parking",
-                    "hotel-internet", "hotel-stars", "hotel-area", "hotel-type", "hotel-bookpeople",
-                    "hotel-bookday", "hotel-bookstay", "train-destination", "train-departure",
-                    "train-day", "train-bookpeople"]
+                      "attraction-area", "attraction-type", "hotel-pricerange", "hotel-parking",
+                      "hotel-internet", "hotel-stars", "hotel-area", "hotel-type", "hotel-bookpeople",
+                      "hotel-bookday", "hotel-bookstay", "train-destination", "train-departure",
+                      "train-day", "train-bookpeople"]
 
     ontology = {k: set() for k in noncat_slot_names+cat_slot_names}
 
@@ -192,4 +200,6 @@ def load_multiwoz_22_database():
                                 continue
                             for v in values:
                                 ontology[ds].add(f" {v} ")
+
+    ontology['restaurant-area'].add(" center ")
     return ontology

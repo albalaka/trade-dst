@@ -11,6 +11,10 @@ import utils.utils
 
 
 def main(**kwargs):
+    # kwargs['dataset'] = 'multiwoz_22'
+    # kwargs['lang_path'] = 'lang_data_multiwoz_22'
+    # kwargs['appended_values'] = 'DB'
+
     logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
     avg_best, count, accuracy = 0.0, 0, 0.0
@@ -28,7 +32,7 @@ def main(**kwargs):
 
     gradient_accumulation_steps = kwargs['batch_size']/kwargs['MAX_GPU_SAMPLES']
 
-    for epoch in range(200):
+    for epoch in range(20):
         print(f"Epoch {epoch}")
         if logger:
             logger.save()
