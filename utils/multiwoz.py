@@ -11,7 +11,6 @@ from BertForValueExtraction import BertForValueExtraction
 from transformers import BertTokenizer
 from tqdm import tqdm
 
-from dataset_analysis import find_database_value_in_utterance, load_multiwoz_database
 
 import en_core_web_sm
 ner = en_core_web_sm.load()
@@ -30,6 +29,17 @@ ner = en_core_web_sm.load()
 #   in alon_TRADE.TRADE.compute_slot_acc() they may have been calculating accuracy incorrectly??
 
 EXPERIMENT_DOMAINS = ["hotel", "train", "restaurant", "attraction", "taxi"]
+
+
+def normalize_text(s):
+    # add a space at beginning and end of every utterance so that
+    #   first and last tokens can be found when compared to database
+    s = " "+s+" "
+    # add a space before and after anything found in group 1
+    s = re.sub('([.,!?()])', r' \1 ', s)
+    # replace 2 or more spaces with a single space
+    s = re.sub('\s{2,}', ' ', s)
+    return s
 
 
 class Lang():
@@ -52,8 +62,7 @@ class Lang():
         """Add words to language"""
         if word_type == 'utter':
             # add a single space before punctuation
-            sent = re.sub('([.,!?()])', r' \1 ', sent)
-            sent = re.sub('\s{2,}', ' ', sent)
+            sent = normalize_text(sent)
             for word in sent.split(" "):
                 self.index_word(word)
         elif word_type == 'slot':
@@ -429,7 +438,7 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
             # current turn dialogue consists of
             #   SYS_token, SYS utterance, SYS labels, USR token, USR utterance, USR labels
             if use_USR_SYS_tokens:
-                current_turn_dialogue = f" {SYS_token}"
+                current_turn_dialogue = f"{SYS_token}"
             else:
                 current_turn_dialogue = ""
 
@@ -475,14 +484,13 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                     # reset turn dialogue since we always start with system utterance
                     current_turn_dialogue = ""
                     if use_USR_SYS_tokens:
-                        current_turn_dialogue += f" {SYS_token}"
+                        current_turn_dialogue += SYS_token
 
                     value_kwargs['speaker'] = "system"
                     current_turn_utterance = get_turn(turn['utterance'], appended_values, ENT_token, **value_kwargs)
                     # add a single space before punctuation
-                    current_turn_utterance = re.sub('([.,!?()])', r' \1 ', current_turn_utterance)
-                    current_turn_utterance = re.sub('\s{2,}', ' ', current_turn_utterance)
-                    current_turn_dialogue += f" {current_turn_utterance}"
+                    current_turn_utterance = normalize_text(current_turn_utterance)
+                    current_turn_dialogue += current_turn_utterance
 
                 # First, handle USER turns
                 if turn['speaker'] == "USER":
@@ -520,19 +528,18 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                             current_belief_state[ds] = " ".join(v)
 
                     if use_USR_SYS_tokens:
-                        current_turn_dialogue += f" {USR_token} "
+                        current_turn_dialogue += USR_token
                     else:
-                        current_turn_dialogue += " ; "
+                        current_turn_dialogue += ";"
 
                     value_kwargs['speaker'] = 'user'
                     current_turn_utterance = get_turn(turn['utterance'], appended_values, ENT_token, **value_kwargs)
                     # add a single space before punctuation
-                    current_turn_utterance = re.sub('([.,!?()])', r' \1 ', current_turn_utterance)
-                    current_turn_utterance = re.sub('\s{2,}', ' ', current_turn_utterance)
+                    current_turn_utterance = normalize_text(current_turn_utterance)
                     current_turn_dialogue += current_turn_utterance
 
                     if not use_USR_SYS_tokens:
-                        current_turn_dialogue += " ;"
+                        current_turn_dialogue += ";"
 
                     dialogue_history += current_turn_dialogue
                     source_text = dialogue_history.strip()
