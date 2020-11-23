@@ -11,10 +11,6 @@ import utils.utils
 
 
 def main(**kwargs):
-    # kwargs['dataset'] = 'multiwoz_22'
-    # kwargs['lang_path'] = 'lang_data_multiwoz_22'
-    # kwargs['appended_values'] = 'DB'
-
     logger = simple_logger(kwargs) if kwargs['log_path'] else None
 
     avg_best, count, accuracy = 0.0, 0, 0.0
