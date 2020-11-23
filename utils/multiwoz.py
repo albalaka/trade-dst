@@ -39,6 +39,7 @@ cat_slot_names = ["restaurant-pricerange", "restaurant-area", "restaurant-bookda
                   "hotel-internet", "hotel-stars", "hotel-area", "hotel-type", "hotel-bookpeople",
                   "hotel-bookday", "hotel-bookstay", "train-destination", "train-departure",
                   "train-day", "train-bookpeople"]
+combined_slot_names = noncat_slots_names + cat_slot_names
 
 
 def normalize_text(s):
@@ -434,6 +435,10 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
             # current turn labels may be appended to end of an utterance if using ground truth labels
             current_turn_labels = {}
 
+            # track slot-values as they occur so that we can track
+            #   slot values on a turn-by-turn basis
+            prev_GT = {}
+
             # current turn dialogue consists of
             #   SYS_token, SYS utterance, SYS labels, USR token, USR utterance, USR labels
             if use_USR_SYS_tokens:
@@ -467,7 +472,7 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                         for slot in frame['slots']:
 
                             # confirm that we want to track this slot value
-                            if slot['slot'] not in cat_slot_names+noncat_slots_names:
+                            if slot['slot'] not in combined_slot_names:
                                 continue
 
                             # If we are taking this direct from the utterance
@@ -496,7 +501,7 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                     current_belief_state = {}
                     for frame in turn['frames']:
                         for ds, v in frame['state']['slot_values'].items():
-                            if ds not in cat_slot_names+noncat_slots_names:
+                            if ds not in combined_slot_names:
                                 continue
                             current_belief_state[ds] = v
                             if ds in noncat_slots_uttered.keys():
@@ -505,7 +510,7 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                     for frame in turn['frames']:
                         for slot in frame['slots']:
                             # confirm that we want to track this slot value
-                            if slot['slot'] not in cat_slot_names+noncat_slots_names:
+                            if slot['slot'] not in combined_slot_names:
                                 continue
 
                             if 'copy_from' not in slot.keys():
@@ -535,6 +540,15 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                         current_turn_dialogue += USR_token
                     else:
                         current_turn_dialogue += ";"
+
+                    value_kwargs['turn_label'] = current_belief_state.copy()
+                    value_kwargs['turn_label'] = []
+                    for ds, value in current_belief_state.items():
+                        if ds not in prev_GT.keys():
+                            value_kwargs['turn_label'].append([ds, value])
+                        else:
+                            if prev_GT[ds] != current_belief_state[ds]:
+                                value_kwargs['turn_label'].append([ds, value])
 
                     value_kwargs['speaker'] = 'user'
                     current_turn_utterance = get_turn(turn['utterance'], appended_values, ENT_token, **value_kwargs)
@@ -603,6 +617,9 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                         else:
                             generate_y.append("none")
                             gating_label.append(gating_dict['none'])
+
+                    # track current dialogue state
+                    prev_GT.update(current_belief_state)
 
                     # Add data_details to data
                     data_detail = {
