@@ -11,13 +11,17 @@ ENT_token = 4
 SYS_token = 5
 USR_token = 6
 
-MAX_GPU_SAMPLES = 4
-BINARY_SLOTS = ['hotel-parking', 'hotel-internet']
-# CATEGORICAL_SLOTS = ['hotel-pricerange', 'hotel-book day', 'train-day', 'hotel-stars', 'restaurant-food', 'restaurant-pricerange', 'restaurant-book day']
-CATEGORICAL_SLOTS = ['hotel-pricerange', 'hotel-book day', 'hotel-stars', 'hotel-area',
-                     'train-day',
-                     'attraction-area',
-                     'restaurant-food', 'restaurant-pricerange', 'restaurant-area', 'restaurant-book day']
+MAX_GPU_SAMPLES = 8
+
+NON_CATEGORICAL_SLOTS = ["restaurant-food", "restaurant-name", "restaurant-booktime",
+                         "attraction-name", "hotel-name", "taxi-destination",
+                         "taxi-departure", "taxi-arriveby", "taxi-leaveat",
+                         "train-arriveby", "train-leaveat"]
+CATEGORICAL_SLOTS = ["restaurant-pricerange", "restaurant-area", "restaurant-bookday", "restaurant-bookpeople",
+                     "attraction-area", "attraction-type", "hotel-pricerange", "hotel-parking",
+                     "hotel-internet", "hotel-stars", "hotel-area", "hotel-type", "hotel-bookpeople",
+                     "hotel-bookday", "hotel-bookstay", "train-destination", "train-departure",
+                     "train-day", "train-bookpeople"]
 ALL_SLOTS = ['hotel-pricerange', 'hotel-type', 'hotel-parking', 'hotel-book stay', 'hotel-book day', 'hotel-book people',
              'hotel-area', 'hotel-stars', 'hotel-internet', 'train-destination', 'train-day', 'train-departure',
              'train-arriveby', 'train-book people', 'train-leaveat', 'attraction-area', 'restaurant-food',
@@ -51,17 +55,15 @@ def parse_args():
     parser.add_argument('--dev_data_ratio', type=int, default=100)
     parser.add_argument('--test_data_ratio', type=int, default=100)
     parser.add_argument('--percent_ground_truth', type=int, default=100)
-    parser.add_argument('--no_binary_slots', action='store_true')
-    parser.add_argument('--only_binary_slots', action='store_true')
     parser.add_argument('--no_categorical_slots', action='store_true')
-    parser.add_argument('--no_binary_evaluation', action='store_true', help="remove binary slots from test/evaluate")
-    parser.add_argument('--only_binary_evaluation', action='store_true')
     parser.add_argument('--no_categorical_evaluation', action='store_true')
     parser.add_argument('--only_categorical_evaluation', action='store_true')
     parser.add_argument('--appended_values', type=str, default=None,
                         choices=['NER', 'ground_truth', 'boosted_NER', 'BERT_VE', 'DB'])
     parser.add_argument('--USR_SYS_tokens', action='store_true')
     parser.add_argument('--append_SYS_values', action='store_true')
+    parser.add_argument('--ground_truth_slots', type=str, default="all",
+                        choices=["all", "categorical", "noncategorical"])
 
     args = parser.parse_args()
 
@@ -78,29 +80,25 @@ def parse_args():
 
     # if not using all slots, add them to drop slots
     setattr(args, 'drop_slots', list())
-    if args.no_binary_slots:
-        args.drop_slots.extend(BINARY_SLOTS)
     if args.no_categorical_slots:
         args.drop_slots.extend(CATEGORICAL_SLOTS)
-    if args.only_binary_slots:
-        args.drop_slots = ALL_SLOTS
-        for slot in BINARY_SLOTS:
-            args.drop_slots.remove(slot)
 
     setattr(args, "eval_slots", ALL_SLOTS)
-    if args.only_binary_evaluation:
-        args.eval_slots = BINARY_SLOTS
     if args.only_categorical_evaluation:
         args.eval_slots = CATEGORICAL_SLOTS
-    if args.no_binary_evaluation:
-        for slot in BINARY_SLOTS:
-            args.eval_slots.remove(slot)
     if args.no_categorical_evaluation:
         for slot in CATEGORICAL_SLOTS:
             args.eval_slots.remove(slot)
     # print(f"Evaluating on {args.eval_slots}")
     if args.dataset == 'multiwoz_22':
         setattr(args, "lang_path", "lang_data_multiwoz_22")
+
+    if args.ground_truth_slots == 'all':
+        args.ground_truth_slots = ALL_SLOTS
+    if args.ground_truth_slots == "categorical":
+        args.ground_truth_slots = CATEGORICAL_SLOTS
+    if args.ground_truth_slots == "noncategorical":
+        args.ground_truth_slots = NON_CATEGORICAL_SLOTS
 
     assert(not(getattr(args, "appended_values") == "ground_truth" and getattr(args, "append_SYS_values"))),\
         "Ground truth values are not determined by the speaker, appending these values to the system utterance\
@@ -123,7 +121,7 @@ def parse_args():
 #             found_values[domain_slot] = matches
 #     return found_values
 
-def find_database_value_in_utterance(utterance, database):
+def find_database_value_in_utterance_by_slot(utterance, database):
     found_values = {}
     for domain_slot, values in database.items():
         # matches = re.findall(r"(?=("+'|'.join(values)+r")){e<=1}",
@@ -138,6 +136,19 @@ def find_database_value_in_utterance(utterance, database):
         if matches:
             found_values[domain_slot] = [m.strip() for m in matches]
 
+    return found_values
+
+
+def find_database_value_in_utterance(utterance, database):
+    found_values = set()
+    for ds, values in database.items():
+        matches = []
+        utter_lower = utterance.lower()
+        for v in values:
+            if v.lower() in utter_lower:
+                matches.append(v)
+        for m in matches:
+            found_values.add(m.strip())
     return found_values
 
 
