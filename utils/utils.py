@@ -44,9 +44,9 @@ def parse_args():
     parser.add_argument('-tfr', '--teacher_forcing_ratio', help='teacher_forcing_ratio', type=float, default=0.5)
     parser.add_argument('--load_embedding', type=bool, default=True)
     parser.add_argument('--model_path', type=str, help="Use model_path if you want to load a pre-trained model")
-    parser.add_argument('--lang_path', type=str, default="lang_data")
-    parser.add_argument('--log_path', type=str)
-    parser.add_argument('--dataset', type=str, default='multiwoz')
+    parser.add_argument('--lang_path', type=str, default="lang_data_multiwoz_22")
+    parser.add_argument('--log_path', type=str, default=None)
+    parser.add_argument('--dataset', type=str, default='multiwoz_22')
     parser.add_argument('--task', type=str, default='DST')
     parser.add_argument('--patience', type=int, default=6)
     parser.add_argument('--eval_patience', type=int, default=1)
@@ -90,8 +90,10 @@ def parse_args():
         for slot in CATEGORICAL_SLOTS:
             args.eval_slots.remove(slot)
     # print(f"Evaluating on {args.eval_slots}")
-    if args.dataset == 'multiwoz_22':
-        setattr(args, "lang_path", "lang_data_multiwoz_22")
+    if args.dataset == 'multiwoz':
+        setattr(args, "lang_path", "lang_data")
+    if not args.log_path:
+        args.log_path = f"logs/{args.experiment_ID}_log.json"
 
     if args.ground_truth_slots == 'all':
         args.ground_truth_slots = ALL_SLOTS
