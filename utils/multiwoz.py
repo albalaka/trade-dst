@@ -98,10 +98,11 @@ class Lang():
             self.n_words += 1
 
 
-def append_GT_values(turn, turn_label, ENT_token, percent_ground_truth):
+def append_GT_values(turn, turn_label, ENT_token, percent_ground_truth, slots):
     for domain_slot, value in turn_label:
-        if random.random() <= percent_ground_truth*0.01:
-            turn += f" {ENT_token} {value}"
+        if domain_slot in slots:
+            if random.random() <= percent_ground_truth*0.01:
+                turn += f" {ENT_token} {value}"
     return turn
 
 
@@ -135,11 +136,18 @@ def append_BERT_VE_values(turn, ve_model, tokenizer, ENT_token):
     return turn
 
 
-def append_DB_values(turn, database, ENT_token):
+def append_DB_values_include_domain_slot_name(turn, database, ENT_token):
     domain_slot_values = find_database_value_in_utterance(turn, database)
     for ds, value in domain_slot_values.items():
         for v in value:
             turn += f" {ENT_token} {ds} {v}"
+    return turn
+
+
+def append_DB_values(turn, database, ENT_token):
+    domain_slot_values = find_database_value_in_utterance(turn, database)
+    for value in domain_slot_values:
+        turn += f" {ENT_token} {value}"
     return turn
 
 
@@ -162,7 +170,7 @@ def get_turn(turn, value_source, ENT_token, **kwargs):
     #       this is a user turn
     if value_source == 'ground_truth':
         current_turn_dialogue = append_GT_values(turn, kwargs['turn_label'], ENT_token,
-                                                 kwargs['percent_ground_truth'])
+                                                 kwargs['percent_ground_truth'], kwargs['ground_truth_slots'])
 
     elif value_source == "NER":
         current_turn_dialogue = append_NER_values(turn, ENT_token)
@@ -372,7 +380,8 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                               USR_token=None, ENT_token=None, appended_values=None,
                               append_SYS_values=False,
                               percent_ground_truth=100, only_domain='',
-                              except_domain='', data_ratio=100, drop_slots=None):
+                              except_domain='', data_ratio=100, drop_slots=None,
+                              ground_truth_slots=combined_slot_names):
     """ Load a dataset of dialogues and add utterances, slots, domains
     :param dataset_path: path to multiple json datasets
     :param gating_dict: dict with mapping for gating mechanism (ptr, dont care, none)
@@ -391,7 +400,8 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
 
     value_kwargs = {'turn_label': None,
                     'percent_ground_truth': percent_ground_truth,
-                    'append_SYS_values': append_SYS_values}
+                    'append_SYS_values': append_SYS_values,
+                    'ground_truth_slots': ground_truth_slots}
 
     # If we need the BERT_VE model, load it, and the tokenizer
     if appended_values == 'BERT_VE':
@@ -465,14 +475,13 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                 # First, handle SYSTEM turns
                 if turn['speaker'] == "SYSTEM":
                     # TODO: keep track of slot-values from system utterance?
-                    # TODO: keep track of slot-values from only this turn?
 
                     # get any new slot values
                     for frame in turn['frames']:
                         for slot in frame['slots']:
 
                             # confirm that we want to track this slot value
-                            if slot['slot'] not in combined_slot_names:
+                            if slot['slot'] not in slots:
                                 continue
 
                             # If we are taking this direct from the utterance
@@ -501,7 +510,7 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                     current_belief_state = {}
                     for frame in turn['frames']:
                         for ds, v in frame['state']['slot_values'].items():
-                            if ds not in combined_slot_names:
+                            if ds not in slots:
                                 continue
                             current_belief_state[ds] = v
                             if ds in noncat_slots_uttered.keys():
@@ -510,7 +519,7 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                     for frame in turn['frames']:
                         for slot in frame['slots']:
                             # confirm that we want to track this slot value
-                            if slot['slot'] not in combined_slot_names:
+                            if slot['slot'] not in slots:
                                 continue
 
                             if 'copy_from' not in slot.keys():
@@ -897,7 +906,8 @@ def prepare_data_multiwoz_22(training, **kwargs):
                                                                           append_SYS_values=kwargs['append_SYS_values'],
                                                                           percent_ground_truth=kwargs['percent_ground_truth'],
                                                                           data_ratio=kwargs['train_data_ratio'],
-                                                                          drop_slots=kwargs['drop_slots'])
+                                                                          drop_slots=kwargs['drop_slots'],
+                                                                          ground_truth_slots=kwargs['ground_truth_slots'])
         dataloader_train = get_sequence_dataloader(data_train, lang, mem_lang, batch_size)
         vocab_size_train = lang.n_words
 
@@ -911,7 +921,8 @@ def prepare_data_multiwoz_22(training, **kwargs):
                                                                     append_SYS_values=kwargs['append_SYS_values'],
                                                                     percent_ground_truth=kwargs['percent_ground_truth'],
                                                                     data_ratio=kwargs['dev_data_ratio'],
-                                                                    drop_slots=kwargs['drop_slots'])
+                                                                    drop_slots=kwargs['drop_slots'],
+                                                                    ground_truth_slots=kwargs['ground_truth_slots'])
         dataloader_dev = get_sequence_dataloader(data_dev, lang, mem_lang, batch_size)
 
         data_test, max_len_test, slot_test = read_language_multiwoz_22(files_test, gating_dict, all_slots, "test", lang,
@@ -963,7 +974,8 @@ def prepare_data_multiwoz_22(training, **kwargs):
                                                                        append_SYS_values=kwargs['append_SYS_values'],
                                                                        percent_ground_truth=kwargs['percent_ground_truth'],
                                                                        data_ratio=kwargs['test_data_ratio'],
-                                                                       drop_slots=kwargs['drop_slots'])
+                                                                       drop_slots=kwargs['drop_slots'],
+                                                                       ground_truth_slots=kwargs['ground_truth_slots'])
 
         dataloader_test = get_sequence_dataloader(data_test, lang, mem_lang, batch_size)
 
