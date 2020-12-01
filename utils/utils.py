@@ -11,7 +11,7 @@ ENT_token = 4
 SYS_token = 5
 USR_token = 6
 
-MAX_GPU_SAMPLES = 8
+MAX_GPU_SAMPLES = 4
 
 NON_CATEGORICAL_SLOTS = ["restaurant-food", "restaurant-name", "restaurant-booktime",
                          "attraction-name", "hotel-name", "taxi-destination",
