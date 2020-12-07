@@ -28,7 +28,7 @@ def main(**kwargs):
 
     gradient_accumulation_steps = kwargs['batch_size']/kwargs['MAX_GPU_SAMPLES']
 
-    for epoch in range(20):
+    for epoch in range(200):
         print(f"Epoch {epoch}")
         if logger:
             logger.save()

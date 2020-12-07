@@ -472,14 +472,7 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
                                 continue
 
                             # If we are taking this direct from the utterance
-                            if 'copy_from' not in slot.keys():
-                                val = slot['value']
-
-                            # If we need to copy this value from another slot
-                            else:
-                                val = noncat_slots_uttered[slot['copy_from']]
-
-                            noncat_slots_uttered[slot['slot']] = val
+                            noncat_slots_uttered[slot['slot']] = slot['value']
 
                     # reset turn dialogue since we always start with system utterance
                     current_turn_dialogue = ""
@@ -519,14 +512,6 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
 
                             noncat_slots_uttered[slot['slot']] = val
 
-                    current_belief_state.update(noncat_slots_uttered)
-                    # convert slot values to strings
-                    for ds, v in current_belief_state.items():
-                        if type(v) == list and len(v) == 1:
-                            current_belief_state[ds] = v[0]
-                        if type(v) == list and len(v) > 1:
-                            current_belief_state[ds] = " ".join(v)
-
                     if use_USR_SYS_tokens:
                         current_turn_dialogue += USR_token
                     else:
@@ -543,6 +528,27 @@ def read_language_multiwoz_22(dataset_paths, gating_dict, slots, dataset, langua
 
                     dialogue_history += current_turn_dialogue
                     source_text = dialogue_history.strip()
+
+                    current_belief_state.update(noncat_slots_uttered)
+                    # convert slot values to strings
+                    for ds, v in current_belief_state.items():
+                        if type(v) == list and len(v) == 1:
+                            current_belief_state[ds] = v[0]
+                        if type(v) == list and len(v) > 1:
+                            val1_ends = [m.end() for m in re.finditer(v[0], dialogue_history)]
+                            val2_ends = [m.end() for m in re.finditer(v[1], dialogue_history)]
+                            if val1_ends and not val2_ends:
+                                current_belief_state[ds] = v[0]
+                            if not val1_ends and val2_ends:
+                                current_belief_state[ds] = v[1]
+                            if not val1_ends and not val2_ends:
+                                current_belief_state[ds] = v[0]
+                            if val1_ends and val2_ends:
+                                if val1_ends[-1] > val2_ends[-1]:
+                                    current_belief_state[ds] = v[0]
+                                else:
+                                    current_belief_state[ds] = v[1]
+                            # current_belief_state[ds] = " ".join(v)
 
                     # For training/testing on separate domains
                     # Generate domain-dependent slot list
